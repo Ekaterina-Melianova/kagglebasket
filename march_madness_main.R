@@ -41,7 +41,7 @@ library('kableExtra') # display
 # networks
 library(igraph)
 
-setwd("C:/Users/Artem/Google Drive/KAGGLE/March_Madness_Analytics_2020")
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 
 
 
@@ -93,101 +93,101 @@ df_Seasons <- read.csv('MDataFiles_Stage2/MSeasons.csv')
 play_by_play <- data.frame()
 
 # loop through each seasons PlayByPlay folders and read in in the play by play files
-setwd("C:/Users/Artem/Google Drive/KAGGLE/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
 
-for(each in list.files()[str_detect(list.files(), "MEvents")]) {
-  
-  df <- read_csv(paste0(each))
-  
-  # Grouped shooting variables ----------------------------------------------
-  # there are some shooting variables that can probably be condensed - tip ins and dunks
-  paint_attempts_made <- c("made2_dunk", "made2_lay", "made2_tip") 
-  paint_attempts_missed <- c("miss2_dunk", "miss2_lay", "miss2_tip") 
-  paint_attempts <- c(paint_attempts_made, paint_attempts_missed)
-  # create variables for field goals made, and also field goals attempted (which includes the sum of FGs made and FGs missed)
-  FGM <- c("made2_dunk", "made2_jump", "made2_lay",  "made2_tip",  "made3_jump")
-  FGA <- c(FGM, "miss2_dunk", "miss2_jump" ,"miss2_lay",  "miss2_tip",  "miss3_jump")
-  # variable for three-pointers
-  ThreePointer <- c("made3_jump", "miss3_jump")
-  #  Two point jumper
-  TwoPointJump <- c("miss2_jump", "made2_jump")
-  # Free Throws
-  FT <- c("miss1_free", "made1_free")
-  # all shots
-  AllShots <- c(FGA, FT)
-  
-  
-  # Feature Engineering -----------------------------------------------------
-  # paste the two even variables together for FGs as this is the format for last years comp data
-  df <- df %>%
-    mutate_if(is.factor, as.character) %>% 
-    mutate(EventType = ifelse(str_detect(EventType, "miss") | str_detect(EventType, "made") | str_detect(EventType, "reb"), paste0(EventType, "_", EventSubType), EventType))
-  
-  # change the unknown for 3s to "jump" and for FTs "free"
-  df <- df %>% 
-    mutate(EventType = ifelse(str_detect(EventType, "3"), str_replace(EventType, "_unk", "_jump"), EventType),
-           EventType = ifelse(str_detect(EventType, "1"), str_replace(EventType, "_unk", "_free"), EventType))
-  
-  
-  df <- df %>% 
-    # create a variable in the df for whether the attempts was made or missed
-    mutate(shot_outcome = ifelse(grepl("made", EventType), "Made", ifelse(grepl("miss", EventType), "Missed", NA))) %>%
-    # identify if the action was a field goal, then group it into the attempt types set earlier
-    mutate(FGVariable = ifelse(EventType %in% FGA, "Yes", "No"),
-           AttemptType = ifelse(EventType %in% paint_attempts, "PaintPoints", 
-                                ifelse(EventType %in% ThreePointer, "ThreePointJumper", 
-                                       ifelse(EventType %in% TwoPointJump, "TwoPointJumper", 
-                                              ifelse(EventType %in% FT, "FreeThrow", "NoAttempt")))))
-  
-  
-  # Rework DF so only shots are included and whatever lead to the shot --------
-  df <- df %>% 
-    mutate(GameID = paste(Season, DayNum, WTeamID, LTeamID, sep = "_")) %>% 
-    group_by(GameID, ElapsedSeconds) %>% 
-    mutate(EventType2 = lead(EventType),
-           EventPlayerID2 = lead(EventPlayerID)) %>% ungroup()
-  
-  
-  df <- df %>% 
-    mutate(FGVariableAny = ifelse(EventType %in% FGA | EventType2 %in% FGA, "Yes", "No")) %>% 
-    filter(FGVariableAny == "Yes") 
-  
-  
-  # create a variable for if the shot was made, but then the second event was also a made shot
-  df <- df %>% 
-    mutate(Alert = ifelse(EventType %in% FGM & EventType2 %in% FGM, "Alert", "OK")) %>% 
-    # only keep "OK" observations
-    filter(Alert == "OK")
-  
-
-  # replace NAs with somerhing
-  df$EventType2[is.na(df$EventType2)] <- "no_second_event"
-  
-  
-  # create a variable for if there was an assist on the FGM:
-  df <- df %>% 
-    mutate(AssistedFGM = ifelse(EventType %in% FGM & EventType2 == "assist", "Assisted", 
-                                ifelse(EventType %in% FGM & EventType2 != "assist", "Solo", 
-                                       ifelse(EventType %in% FGM & EventType2 == "no_second_event", "Solo", "None"))))
-  
-  # # because the FGA culd be either in `EventType` (more likely) or `EventType2` (less likely), need
-  # # one variable to indicate the shot type
-  # df <- df %>% \
-  #   mutate(fg_type = ifelse(EventType %in% FGA, EventType, ifelse(EventType2 %in% FGA, EventType2, "Unknown")))
-  
-  # create final output
-  df <- df %>% ungroup()
-  play_by_play <- bind_rows(play_by_play, df)
-  print(each)
-  
-  rm(df); gc()
-}
-
-saveRDS(play_by_play, "play_by_play2015_19.rds")
+#for(each in list.files()[str_detect(list.files(), "MEvents")]) {
+#  
+#  df <- read_csv(paste0(each))
+#  
+#  # Grouped shooting variables ----------------------------------------------
+#  # there are some shooting variables that can probably be condensed - tip ins and dunks
+##  paint_attempts_made <- c("made2_dunk", "made2_lay", "made2_tip") 
+#  paint_attempts_missed <- c("miss2_dunk", "miss2_lay", "miss2_tip") 
+#  paint_attempts <- c(paint_attempts_made, paint_attempts_missed)
+#  # create variables for field goals made, and also field goals attempted (which includes the sum of FGs made and FGs missed)
+#  FGM <- c("made2_dunk", "made2_jump", "made2_lay",  "made2_tip",  "made3_jump")
+#  FGA <- c(FGM, "miss2_dunk", "miss2_jump" ,"miss2_lay",  "miss2_tip",  "miss3_jump")
+#  # variable for three-pointers
+#  ThreePointer <- c("made3_jump", "miss3_jump")
+#  #  Two point jumper
+#  TwoPointJump <- c("miss2_jump", "made2_jump")
+#  # Free Throws
+#  FT <- c("miss1_free", "made1_free")
+#  # all shots
+#  AllShots <- c(FGA, FT)
+#  
+#  
+#  # Feature Engineering -----------------------------------------------------
+#  # paste the two even variables together for FGs as this is the format for last years comp data
+#  df <- df %>%
+#    mutate_if(is.factor, as.character) %>% 
+#    mutate(EventType = ifelse(str_detect(EventType, "miss") | str_detect(EventType, "made") | str_detect(EventType, "reb"), paste0(EventType, "_", EventSubType), EventType))
+#  
+#  # change the unknown for 3s to "jump" and for FTs "free"
+#  df <- df %>% 
+#    mutate(EventType = ifelse(str_detect(EventType, "3"), str_replace(EventType, "_unk", "_jump"), EventType),
+#           EventType = ifelse(str_detect(EventType, "1"), str_replace(EventType, "_unk", "_free"), EventType))
+#  
+#  
+#  df <- df %>% 
+#    # create a variable in the df for whether the attempts was made or missed
+#    mutate(shot_outcome = ifelse(grepl("made", EventType), "Made", ifelse(grepl("miss", EventType), "Missed", NA))) %>%
+#    # identify if the action was a field goal, then group it into the attempt types set earlier
+#    mutate(FGVariable = ifelse(EventType %in% FGA, "Yes", "No"),
+#           AttemptType = ifelse(EventType %in% paint_attempts, "PaintPoints", 
+#                                ifelse(EventType %in% ThreePointer, "ThreePointJumper", 
+#                                       ifelse(EventType %in% TwoPointJump, "TwoPointJumper", 
+#                                              ifelse(EventType %in% FT, "FreeThrow", "NoAttempt")))))
+#  
+#  
+#  # Rework DF so only shots are included and whatever lead to the shot --------
+#  df <- df %>% 
+#    mutate(GameID = paste(Season, DayNum, WTeamID, LTeamID, sep = "_")) %>% 
+#    group_by(GameID, ElapsedSeconds) %>% 
+#    mutate(EventType2 = lead(EventType),
+#           EventPlayerID2 = lead(EventPlayerID)) %>% ungroup()
+#  
+#  
+#  df <- df %>% 
+#    mutate(FGVariableAny = ifelse(EventType %in% FGA | EventType2 %in% FGA, "Yes", "No")) %>% 
+#    filter(FGVariableAny == "Yes") 
+#  
+#  
+#  # create a variable for if the shot was made, but then the second event was also a made shot
+#  df <- df %>% 
+#    mutate(Alert = ifelse(EventType %in% FGM & EventType2 %in% FGM, "Alert", "OK")) %>% 
+#    # only keep "OK" observations
+#    filter(Alert == "OK")
+#  
+#
+#  # replace NAs with somerhing
+#  df$EventType2[is.na(df$EventType2)] <- "no_second_event"
+#  
+#  
+#  # create a variable for if there was an assist on the FGM:
+#  df <- df %>% 
+#    mutate(AssistedFGM = ifelse(EventType %in% FGM & EventType2 == "assist", "Assisted", 
+#                                ifelse(EventType %in% FGM & EventType2 != "assist", "Solo", 
+#                                       ifelse(EventType %in% FGM & EventType2 == "no_second_event", "Solo", "None"))))
+#  
+#  # # because the FGA culd be either in `EventType` (more likely) or `EventType2` (less likely), need
+#  # # one variable to indicate the shot type
+#  # df <- df %>% \
+#  #   mutate(fg_type = ifelse(EventType %in% FGA, EventType, ifelse(EventType2 %in% FGA, EventType2, "Unknown")))
+#  
+#  # create final output
+#  df <- df %>% ungroup()
+#  play_by_play <- bind_rows(play_by_play, df)
+#  print(each)
+#  
+#  rm(df); gc()
+#}
+#
+#saveRDS(play_by_play, "play_by_play2015_19.rds")
 
 
 # Load preprocessed final play-by-play data
-setwd("C:/Users/Artem/Google Drive/KAGGLE/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
+#setwd("C:/Users/Artem/Google Drive/KAGGLE/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
 play_by_play <- readRDS("play_by_play2015_19.rds")
 
 # Select only 2016 Season for now
