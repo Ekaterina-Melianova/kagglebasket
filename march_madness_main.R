@@ -473,16 +473,16 @@ plot.igraph(g, edge.color=adjustcolor("darkgray", .3),
 # TODO: Reverse network - coaches network based on the common teams
 
 # Dataframe with team and coaches affilated with it
-team_coaches <- group_by(edgelist_team_coach, team_id) %>%
-  summarize(type = list(sort(unique(coach_name))))
+team_coaches <- group_by(edgelist_team_coach, coach_name) %>%
+  summarize(type = list(sort(unique(team_id))))
 
 # Create adjacency matrix between teams based on the common coaches
 network_team_adjacency <- sapply(seq_len(length(team_coaches$type)), function(x) 
   sapply(seq_len(length(team_coaches$type)),
          function(y) length(intersect(unlist(team_coaches$type[x]), unlist(team_coaches$type[y])))))
 network_team_adjacency <- as.data.frame(network_team_adjacency)
-rownames(network_team_adjacency) <- team_coaches$team_id
-colnames(network_team_adjacency) <- team_coaches$team_id
+rownames(network_team_adjacency) <- team_coaches$coach_name
+colnames(network_team_adjacency) <- team_coaches$coach_name
 
 # Create graph
 network_team_adjacency <- as.matrix(network_team_adjacency)
