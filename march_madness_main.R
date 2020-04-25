@@ -226,6 +226,11 @@ teams_solo_shots <- play_by_play %>%
 
 
 
+
+
+
+
+
 ################################################################################################
 ################ NETWORK №1. NETWORK OF ASSISTS BETWEEN PLAYERS
 ################################################################################################
@@ -439,8 +444,6 @@ plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)
             vertex.size=vertex_size)
 
 
-
-
 ################################################################################################
 ################ NETWORK №2. NETWORK OF TEAMS BASED ON THE PLAYED MATCHES
 ################################################################################################
@@ -451,14 +454,18 @@ setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
 df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
 
-df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season >= 2010)
-df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season >= 2020)
-df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2010)
-df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2000)
+# Select only 2015+ regular season results
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season >= 2015)
+
+# Select only 2015+ tourney results
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2015)
+
+# df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2019)
 
 # Only based on the regular season for now
 # TODO: Tourney or Regural season results?
-# TODO: Regular season centrality as a metric for the Tpurney results
+# TODO: Split Regural season network based on the conferences
+# TODO: Regular season centrality as a metric for the Tourney results
 
 
 ################ 1. NETWORK BASED ON THE REGURAL SEASON RESULTS
@@ -483,7 +490,7 @@ team_to_team_results <- team_to_team_results %>%
   replace_na(list(wins = 0, losses = 0)) %>% 
   mutate(win_perc = wins/(wins + losses) * 100) %>%
   # Select only teams with 10 or more games played between each other
-  filter(wins+losses>=10) %>%
+  filter(wins+losses>=5) %>%
   mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
 
 # Create edgelist between teams on the wins agains each other
@@ -505,7 +512,6 @@ vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.03
 
 plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.kamada.kawai, edge.width=0.01,
             vertex.size=vertex_size, vertex.label=NA)
-
 
 
 ################ 2. NETWORK BASED ON THE TOURNEY RESULTS
@@ -548,12 +554,9 @@ g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
 g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
 
 # Plot the network
-vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.2
+vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.5
 
-plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.kamada.kawai, edge.width=0.01,
-            vertex.size=vertex_size, vertex.label=NA)
-
-plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.circle, edge.width=0.01,
+plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.circle, edge.width=0.01,
             vertex.size=vertex_size, vertex.label=NA)
 
 
