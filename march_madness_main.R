@@ -195,9 +195,9 @@ play_by_play <- play_by_play[play_by_play$Season == 2016,]
 
 
 
-################ 3. DATA PREPROCESSING TEAMS
+################ 2. DATA PREPROCESSING
 
-# 3.1. Percentage of shots made solo in the team
+### 2.1. Percentage of shots made solo in the team
 teams_solo_shots <- play_by_play %>% 
   filter(AssistedFGM != "None") %>% 
   group_by(EventTeamID, AssistedFGM) %>% 
@@ -205,19 +205,32 @@ teams_solo_shots <- play_by_play %>%
   mutate(solo_shot_perc = n / sum(n)) %>% 
   filter(AssistedFGM == "Solo") %>% arrange(desc(solo_shot_perc)) %>% ungroup()
 
-# 3.2. Coach change during the 2015-2020 seasons
+### 2.2. Coach change during the 2015-2020 seasons
 # TODO
 
 
-################ 4. DATA PREPROCESSING PLAYERS
-
-# TODO: Caclulate set of additional statistics for a player
-
+### 2.3. Home city for a team 
+# TODO
 
 
+### 2.4. Home region for a team 
+# TODO 
 
 
-################ 5. CREATE NETWORKS OF ASSISTS
+### 2.5. Home conference for a team 
+# TODO
+
+
+
+
+
+
+
+################################################################################################
+################ NETWORK №1. NETWORK OF ASSISTS BETWEEN PLAYERS
+################################################################################################
+
+################ 3. CREATE NETWORKS OF ASSISTS
 
 # Select only plays with assists
 play_by_play <- subset(play_by_play, EventType2 == "assist")
@@ -280,7 +293,7 @@ for(i in 1:length(team_ids)){
 }
 
 
-################ 6. CALCULATE SET OF NETWORK STATISTICS FOR ALL TEAMS
+################ 4. CALCULATE SET OF NETWORK STATISTICS FOR ALL TEAMS
 
 minmax_normalize <- function(x)
 {
@@ -426,121 +439,122 @@ plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)
             vertex.size=vertex_size)
 
 
-################ 7. CALCULATE NETWORK METRICS FOR EACH PLAYER
-
-TODO:
 
 
+################################################################################################
+################ NETWORK №2. NETWORK OF TEAMS BASED ON THE PLAYED MATCHES
+################################################################################################
 
-################ 8. TEAMS AND COACHES, BI-PARTITE NETWORK
+# Select only 2010-2020 data
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 
-# Create edgelist with number of seasons together as weights
-edgelist_team_coach <- as.data.frame(table(df_TeamCoaches$CoachName, df_TeamCoaches$TeamID))
-edgelist_team_coach <- edgelist_team_coach[edgelist_team_coach$Freq > 0,]
-colnames(edgelist_team_coach) <- c("coach_name", "team_id", "weight")
+df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
 
-# Select only coaches with several teams experience
-temp <- as.data.frame(table(edgelist_team_coach$coach_name))
-temp <- temp[temp$Freq > 1,]
-multi_team_coaches <- as.character(temp$Var1)
-edgelist_team_coach <- edgelist_team_coach[edgelist_team_coach$coach_name %in% multi_team_coaches,]
-edgelist_team_coach$coach_name <- as.character(edgelist_team_coach$coach_name)
-edgelist_team_coach$team_id <- as.character(edgelist_team_coach$team_id)
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season >= 2010)
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season >= 2020)
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2010)
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2000)
 
-# Create bi-partite network
-g <- graph.data.frame(edgelist_team_coach, directed = F)
-V(g)$type <- V(g)$name %in% edgelist_team_coach$coach_name #the second column of edges is TRUE type
-E(g)$weight <- as.numeric(edgelist_team_coach$weight)
-
-# Color the nodes based on the type
-V(g)$color <- V(g)$type
-V(g)$color=gsub("FALSE","red",V(g)$color)
-V(g)$color=gsub("TRUE","blue",V(g)$color)
-
-
-
-layout_bi <- layout_as_bipartite(g)
-
-plot.igraph(g, edge.color=adjustcolor("darkgray", .3), 
-            edge.width=1, layout=layout_bi,
-            vertex.size=1, vertex.label=NA)
-
-# E(g)$weight*0.5
-
-
-################ 9. TEAMS NETWORK BASED ON THE COMMON COACHES
-
-# TODO: Reverse network - coaches network based on the common teams
-
-# Dataframe with team and coaches affilated with it
-team_coaches <- group_by(edgelist_team_coach, coach_name) %>%
-  summarize(type = list(sort(unique(team_id))))
-
-# Create adjacency matrix between teams based on the common coaches
-network_team_adjacency <- sapply(seq_len(length(team_coaches$type)), function(x) 
-  sapply(seq_len(length(team_coaches$type)),
-         function(y) length(intersect(unlist(team_coaches$type[x]), unlist(team_coaches$type[y])))))
-network_team_adjacency <- as.data.frame(network_team_adjacency)
-rownames(network_team_adjacency) <- team_coaches$coach_name
-colnames(network_team_adjacency) <- team_coaches$coach_name
-
-# Create graph
-network_team_adjacency <- as.matrix(network_team_adjacency)
-diag(network_team_adjacency) <- 0
-g <- graph_from_adjacency_matrix(as.matrix(network_team_adjacency))
-g <- as.undirected(g)
-
-# Plot the graph
-plot.igraph(g, edge.color=adjustcolor("darkgray", .3), 
-            edge.width=1, layout=layout.fruchterman.reingold,
-            vertex.size=3, vertex.label=NA)
-
-
-
-################ 10. NETWORK OF TEAMS BASED ON THE MATCHES PLAYED
 # Only based on the regular season for now
 # TODO: Tourney or Regural season results?
+# TODO: Regular season centrality as a metric for the Tpurney results
+
+
+################ 1. NETWORK BASED ON THE REGURAL SEASON RESULTS
+
+# TODO: Color nodes(teams) based on the conference
 
 # Create dataframe with team-to-team wins and loses
-team_to_team <- df_TourneyCompactResults %>% 
+team_to_team_results <- df_RegularSeasonCompactResults %>% 
   # filter(Season >= 2009) %>% 
   count(WTeamID, LTeamID) %>% 
   arrange(desc(n)) %>% 
   left_join(df_Teams %>% select(TeamID, TeamName), by = c("WTeamID" = "TeamID")) %>% 
   rename(WTeamName = TeamName) %>% 
   left_join(df_Teams %>% select(TeamID, TeamName), by = c("LTeamID" = "TeamID")) %>% 
-  rename(LTeamName = TeamName) %>% 
+  rename(LTeamName = TeamName)
+
+team_to_team_results <- team_to_team_results %>%
   # select(-ends_with("ID")) %>% 
   rename(wins = n) %>% 
-  left_join(foo %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
+  left_join(team_to_team_results %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
   rename(losses = n) %>% 
   replace_na(list(wins = 0, losses = 0)) %>% 
   mutate(win_perc = wins/(wins + losses) * 100) %>%
   # Select only teams with 10 or more games played between each other
-  filter(wins+losses>=5) %>%
+  filter(wins+losses>=10) %>%
   mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
-
 
 # Create edgelist between teams on the wins agains each other
 edgelist_wteam_lteam <- df_RegularSeasonCompactResults %>% 
   count(WTeamID, LTeamID) %>%
   mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_")) %>%
-  filter(WTeamID_LTeamID %in% team_to_team$WTeamID_LTeamID) %>% 
+  filter(WTeamID_LTeamID %in% team_to_team_results$WTeamID_LTeamID) %>% 
   select(-c(WTeamID_LTeamID))
 colnames(edgelist_wteam_lteam)[3] <- 'weight'
 
-
 # Create the network
-g <- graph.data.frame(edgelist_wteam_lteam, directed = T)
+g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
 
 # Remove disconnected components
-g <- induced_subgraph(g, components(g)$membership==1)
+g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
 
 # Plot the network
-vertex_size <- as.numeric(strength(g, mode="out")) * 0.05
-plot.igraph(g, edge.arrow.size=0.03, layout=layout.circle, edge.width=0.01,
+vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.03
+
+plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.kamada.kawai, edge.width=0.01,
             vertex.size=vertex_size, vertex.label=NA)
 
+
+
+################ 2. NETWORK BASED ON THE TOURNEY RESULTS
+
+# Create dataframe with team-to-team wins and loses
+team_to_team_results <- df_TourneyCompactResults %>% 
+  # filter(Season >= 2009) %>% 
+  count(WTeamID, LTeamID) %>% 
+  arrange(desc(n)) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("WTeamID" = "TeamID")) %>% 
+  rename(WTeamName = TeamName) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("LTeamID" = "TeamID")) %>% 
+  rename(LTeamName = TeamName)
+
+team_to_team_results <- team_to_team_results %>%
+  # select(-ends_with("ID")) %>% 
+  rename(wins = n) %>% 
+  left_join(team_to_team_results %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
+  rename(losses = n) %>% 
+  replace_na(list(wins = 0, losses = 0)) %>% 
+  mutate(win_perc = wins/(wins + losses) * 100) %>%
+  # Select only teams with 10 or more games played between each other
+  filter(wins+losses>=1) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
+
+# Create edgelist between teams on the wins agains each other
+edgelist_wteam_lteam <- df_TourneyCompactResults %>% 
+  count(WTeamID, LTeamID) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_")) %>%
+  filter(WTeamID_LTeamID %in% team_to_team_results$WTeamID_LTeamID) %>% 
+  select(-c(WTeamID_LTeamID))
+colnames(edgelist_wteam_lteam)[3] <- 'weight'
+
+table(edgelist_wteam_lteam$weight)
+
+# Create the network
+g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
+
+# Remove disconnected components
+g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
+
+# Plot the network
+vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.2
+
+plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.kamada.kawai, edge.width=0.01,
+            vertex.size=vertex_size, vertex.label=NA)
+
+plot.igraph(g_teams, edge.arrow.size=0.03, layout=layout.circle, edge.width=0.01,
+            vertex.size=vertex_size, vertex.label=NA)
 
 
 
