@@ -27,6 +27,7 @@ library('gganimate') # animations
 library('GGally') # visualisation
 library('ggExtra') # visualisation
 library('viridis') # visualisation
+library(gridExtra)
 library('usmap') # geo
 library("PerformanceAnalytics")
 
@@ -412,7 +413,7 @@ plot.igraph(G, edge.arrow.size=0.1, layout=layout.kamada.kawai, edge.width=E(G)$
 
 # 3. Example of the network with Biggest Betweenness centralization
 G <- assist_graphs_list[[which.max(df_TeamsNetworkStats$betweenness_centralization)]]
-vertex_size <- as.numeric(betweenness(G, normalized=T))*200
+vertex_size <- as.numeric(betweenness(G, normalized=T))*50
 plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)$weight*0.3,
             vertex.size=vertex_size)
 
@@ -424,9 +425,6 @@ plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)
 
 
 ################ 6. CALCULATE SET OF NETWORK STATISTICS FOR ALL PLAYERS
-
-# TODO: Ranking of players by centrality
-# TODO: Games with/without players with high centrality
 
 
 calculatePlayerNetworkStatistics <- function(g){
@@ -472,11 +470,6 @@ df_PlayersNetworkStats %>% arrange(-betweenness) %>% head(15) %>%
   ggplot(aes(reorder(FullName, betweenness), betweenness)) +
   geom_col() + scale_y_continuous(limits = c(0.4,0.6), oob=rescale_none) + 
   coord_flip() + theme_hc() 
-
-
-### Games with/without players with high centrality
-
-# TODO
 
 
 
@@ -539,7 +532,7 @@ team_to_team_results <- team_to_team_results %>%
   replace_na(list(wins = 0, losses = 0)) %>% 
   mutate(win_perc = wins/(wins + losses) * 100) %>%
   # Select only teams with 10 or more games played between each other
-  filter(wins+losses>=2) %>%
+  filter(wins+losses>=1) %>%
   mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
 
 # Create edgelist between teams on the wins agains each other
@@ -553,8 +546,32 @@ colnames(edgelist_wteam_lteam)[3] <- 'weight'
 # Add conference name to edgelist
 edgelist_wteam_lteam <- edgelist_wteam_lteam %>% left_join(df_TeamConferences %>% select(ConfAbbrev, WTeamID))
 
-# Create separate graph of matches for each conference
+# Change order of WTeamID and LTeamID
+edgelist_wteam_lteam <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID, weight, ConfAbbrev)
 
+
+
+
+### TODO: Plot on the same plot
+
+# Create the network
+g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
+
+# Remove disconnected components
+# g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
+
+# Plot the network
+vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.1
+plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.kamada.kawai, edge.width=E(g_teams)$weight * 0.1,
+            vertex.size=vertex_size, vertex.label=NA, vertex.color=as.factor(V(g_teams)$region_name))
+
+
+(length(V(g_teams)) * length(V(g_teams))) - length(V(g_teams))
+
+
+### TODO: Plot separatly
+
+# Create separate graph of matches for each conference
 conference_graphs_list <- list()
 confrence_names <- as.character(unique(edgelist_wteam_lteam$ConfAbbrev))
 
@@ -566,22 +583,7 @@ for(i in 1:length(confrence_names)){
 }
 
 
-### Calculate the PageRank centralization for each conference
-
-
-calculateConferenceNetworkStatistics <- function(g){
-  
-  # 1. Alpha Centrality
-  alpha_centrality_vec <- as.numeric(alpha_centrality(g, weights = T))
-  # alpha_centrality_vec <- alpha_centrality_vec + abs(min(alpha_centrality_vec)) + 1
-  # alpha_centrality_vec <- alpha_centrality_vec/sum(alpha_centrality_vec)
-
-  # 2. Alpha Centralization 
-  alpha_centralization <- centralize(alpha_centrality_vec, normalized = F)
-  
-  return(list(alpha_centralization=alpha_centralization))
-}
-
+### Calculate the EigenVector centralization for each conference
 
 calculateConferenceNetworkStatistics <- function(g){
   
@@ -595,12 +597,14 @@ calculateConferenceNetworkStatistics <- function(g){
 }
 
 
-
 df_ConferencesNetworkStats <- lapply(conference_graphs_list, calculateConferenceNetworkStatistics)
 df_ConferencesNetworkStats <- do.call(rbind.data.frame, df_ConferencesNetworkStats)
 
 # Add team_id
 df_ConferencesNetworkStats$conference_name <- confrence_names
+# Add graph_list number
+df_ConferencesNetworkStats$id <- 1:nrow(df_ConferencesNetworkStats)
+
 
 # 1. Example of the network with Biggest EigenVector centralization
 G <- conference_graphs_list[[which.max(df_ConferencesNetworkStats$eigenvector_centralization)]]
@@ -610,54 +614,35 @@ plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)
 
 # 2. Example of the network with Smallest EigenVector centralization
 G <- conference_graphs_list[[which.min(df_ConferencesNetworkStats$eigenvector_centralization)]]
-vertex_size <- as.numeric(eigen_centrality(G, directed=T)$vector) * 20
+vertex_size <- as.numeric(eigen_centrality(G, directed=T)$vector) * 30
 plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)$weight*1,
             vertex.size=vertex_size)
 
 
 
 
-
-
-# 1. Example of the network with Biggest Alpha centralization
-G <- conference_graphs_list[[which.max(df_ConferencesNetworkStats$alpha_centralization)]]
-vertex_size <- as.numeric(alpha_centrality(G, weights = T))
-# vertex_size <- (vertex_size + abs(min(vertex_size)) + 1) * 3
-plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)$weight*0.3,
-            vertex.size=vertex_size)
-
-# 2. Example of the network with Smallest Alpha centralization
-G <- conference_graphs_list[[which.min(df_ConferencesNetworkStats$alpha_centralization)]]
-vertex_size <- as.numeric(alpha_centrality(G, weights = T))
-vertex_size <- (vertex_size + abs(min(vertex_size)) + 1) * 5
-plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)$weight*0.3,
-            vertex.size=vertex_size)
-
-
-
 ### Plot the grid of the conference networks
 
-vertex_size <- as.numeric(strength(conference_graphs_list[[1]], mode="out")) * 3
-plot(conference_graphs_list[[1]], edge.arrow.size=0.2,
-     layout=layout.fruchterman.reingold, edge.width=2,
-     vertex.size=vertex_size, vertex.label=NA)
-
-g1 <- ggnet2(conference_graphs_list[[1]], node.size=as.numeric(strength(conference_graphs_list[[1]], mode="out")) * 3)
-g2 <- ggnet2(conference_graphs_list[[2]], node.size=as.numeric(strength(conference_graphs_list[[2]], mode="out")) * 3)
-g3 <- ggnet2(conference_graphs_list[[3]], node.size=as.numeric(strength(conference_graphs_list[[3]], mode="out")) * 3)
-
-# common plotting parameters
-b = theme(panel.background = element_rect(color = "grey50"))
-z = guides(color = FALSE)
-
-# show each temporal network
-gridExtra::grid.arrange(g1 + z + ggtitle("Conf 1") + b,
-                        g2 + z + ggtitle("Conf 2") + b,
-                        g3 + z + ggtitle("Conf 3") + b,
-                        nrow = 1)
+# Arrange based on the eigenvector centralization
+df_ConferencesNetworkStats <- df_ConferencesNetworkStats %>% arrange(-eigenvector_centralization)
 
 
-### TODO: Plot the change in "competitiveness" of conferences over seasons. Time plot with lines.
+grid_list <- list()
+for(i in 1:nrow(df_ConferencesNetworkStats)){
+  
+  temp_g <- conference_graphs_list[[df_ConferencesNetworkStats$id[i]]]
+  
+  grid_list[[i]] <- ggnet2(temp_g, directed = TRUE, arrow.size = 8,
+                           node.size=as.numeric(eigen_centrality(temp_g, directed=T)$vector)) + 
+    guides(color = FALSE, size = FALSE) + theme(panel.background = element_rect(color = "grey50"))
+  
+}
+
+do.call(grid.arrange, grid_list)
+
+
+### Plot the change in "competitiveness" of conferences over seasons. Time plot with lines.
+
 
 
 
@@ -691,7 +676,7 @@ team_region <- df_TourneySeeds %>% distinct(TeamID, .keep_all = TRUE) %>%
 
 # Select only 2015+ tourney results
 df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
-df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2019)
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2015)
 
 # Create dataframe with team-to-team wins and loses
 team_to_team_results <- df_TourneyCompactResults %>% 
@@ -725,6 +710,9 @@ colnames(edgelist_wteam_lteam)[3] <- 'weight'
 # Drop weights
 edgelist_wteam_lteam$weight <- NULL
 
+# Change order of WTeam and LTeam
+edgelist_wteam_lteam <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID)
+
 # Create the network
 g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
 
@@ -745,8 +733,8 @@ g_teams <- set_vertex_attr(graph=g_teams, name="betweenness_centralization", val
 g_teams <- set_vertex_attr(graph=g_teams, name="pagerank_centralization", value=temp_stats$pagerank_centralization)
 
 # Plot the network
-vertex_size <- as.numeric(strength(g_teams, mode="out")) * 0.5
 
+vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.5
 plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.circle, edge.width=0.01,
             vertex.size=vertex_size, vertex.label=NA, vertex.color=as.factor(V(g_teams)$region_name))
 
@@ -763,7 +751,7 @@ ergm_model.01 <- ergm(g_teams_net ~ edges)
 summary(ergm_model.01)
 
 # Model 2. Edges + Mutality
-ergm_model.02 <- ergm(g_teams_net ~ edges + mutual)
+ergm_model.02 <- ergm(g_teams_net ~ edges + mutual + nodefactor("region_name"))
 summary(ergm_model.02)
 
 # Model 3. Edges + Mutality + IVs
