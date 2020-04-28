@@ -350,46 +350,45 @@ df_MasseyOrdinals_pom <- subset(df_MasseyOrdinals, SystemName=="POM" & Season==2
 df_TeamsNetworkStats <- left_join(df_TeamsNetworkStats, df_MasseyOrdinals_pom, by="TeamID")
 
 
-### Plot Correlation matrix
-
-
-# Elements of the plot
-hist.panel = function (x, ...) {
-  par(new = TRUE)
-  hist(x,
-       col = "light gray",
-       probability = T,
-       axes = FALSE,
-       main = "",
-       breaks = "FD")
-}
-
-panel.cor <- function(x, y, digits=2, prefix="", use="pairwise.complete.obs",
-                      method = 'spearman', cex.cor, ...){
-  usr <- par("usr"); on.exit(par(usr))
-  par(usr = c(0, 1, 0, 1))
-  r <- cor(x, y, use=use, method=method) # MG: remove abs here
-  txt <- format(c(r, 0.123456789), digits=digits)[1]
-  txt <- paste(prefix, txt, sep="")
-  if(missing(cex.cor)) cex <- 1/strwidth(txt)
-  
-  test <- cor.test(x,y, method=method)
-  # borrowed from printCoefmat
-  Signif <- symnum(test$p.value, corr = FALSE, na = FALSE,
-                   cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
-                   symbols = c("***", "**", "*", ".", " "))
-  # MG: add abs here and also include a 30% buffer for small numbers
-  text(0.5, 0.5, txt, cex = cex)
-  text(.8, .8, Signif, cex=cex, col=2)
-}
-
-
-# Plotting cor matrix
-pairs(select(df_TeamsNetworkStats, -c(TeamID)),
-      gap=0, lower.panel=panel.smooth,
-      upper.panel=panel.cor, diag.panel=hist.panel,
-      cex.labels = 1, font.labels = 2)
-
+# ### Plot Correlation matrix
+# 
+# # Elements of the plot
+# hist.panel = function (x, ...) {
+#   par(new = TRUE)
+#   hist(x,
+#        col = "light gray",
+#        probability = T,
+#        axes = FALSE,
+#        main = "",
+#        breaks = "FD")
+# }
+# 
+# panel.cor <- function(x, y, digits=2, prefix="", use="pairwise.complete.obs",
+#                       method = 'spearman', cex.cor, ...){
+#   usr <- par("usr"); on.exit(par(usr))
+#   par(usr = c(0, 1, 0, 1))
+#   r <- cor(x, y, use=use, method=method) # MG: remove abs here
+#   txt <- format(c(r, 0.123456789), digits=digits)[1]
+#   txt <- paste(prefix, txt, sep="")
+#   if(missing(cex.cor)) cex <- 1/strwidth(txt)
+#   
+#   test <- cor.test(x,y, method=method)
+#   # borrowed from printCoefmat
+#   Signif <- symnum(test$p.value, corr = FALSE, na = FALSE,
+#                    cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+#                    symbols = c("***", "**", "*", ".", " "))
+#   # MG: add abs here and also include a 30% buffer for small numbers
+#   text(0.5, 0.5, txt, cex = cex)
+#   text(.8, .8, Signif, cex=cex, col=2)
+# }
+# 
+# 
+# # Plotting cor matrix
+# pairs(select(df_TeamsNetworkStats, -c(TeamID)),
+#       gap=0, lower.panel=panel.smooth,
+#       upper.panel=panel.cor, diag.panel=hist.panel,
+#       cex.labels = 1, font.labels = 2)
+# 
 
 ### 6.1. Simple regression, median_rank as DV, network stats as IVs
 summary(lm(median_rank ~ mean_transitivity + betweenness_centralization + 
@@ -474,6 +473,7 @@ df_PlayersNetworkStats %>% arrange(-betweenness) %>% head(15) %>%
 
 
 
+
 ################################################################################################
 ################ NETWORK №2. NETWORK OF TEAMS BASED ON THE PLAYED MATCHES
 ################################################################################################
@@ -483,20 +483,58 @@ setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 
 
 
-################ 1. CONFERENCE NETWORKS BASED ON THE REGURAL SEASON RESULTS
+### 2.1. Add Home Region for a Team in 2019
 
-# TODO: Split Regural season network based on the conferences
-# TODO: Regular season centrality as a metric for the Tourney results
+df_TourneySeeds <- read.csv('MDataFiles_Stage2/MNCAATourneySeeds.csv')
+df_Seasons <- read.csv('MDataFiles_Stage2/MSeasons.csv')
+
+# Add letter + season to tourney seeds
+df_TourneySeeds <- df_TourneySeeds %>% filter(Season >= 2015) %>%
+  mutate(region_letter=substr(as.character(Seed), 1, 1)) %>%
+  mutate(region_letter_season=paste(region_letter, Season, sep="_"))
+
+# Add region name from df_Seasons
+df_Seasons <- df_Seasons %>% filter(Season >= 2015 & Season != 2020) %>%
+  gather(region_letter, region_name, RegionW:RegionZ, factor_key=TRUE) %>%
+  mutate(region_letter=as.character(substr(region_letter, 7, 7))) %>%
+  mutate(region_letter_season=paste(region_letter, Season, sep="_")) %>%
+  select(region_letter_season, region_name)
+df_TourneySeeds <- df_TourneySeeds %>% left_join(df_Seasons)
+
+# TeamID and corresponding region
+team_region <- df_TourneySeeds %>% distinct(TeamID, .keep_all = TRUE) %>%
+  select(TeamID, region_name) %>% mutate(TeamID=as.character(TeamID))
+
+
+################ 1. CONFERENCE NETWORKS BASED ON THE REGURAL SEASON RESULTS
+################ WHAT CONFERENCES ARE MORE "competitiveness" THAN THE OTHERS
+
 
 df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
 df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
 
 
+### Conferences and seasons. Select for time-series plots
+conf_season <- data.frame(table(df_TeamConferences$ConfAbbrev, df_TeamConferences$Season))
+colnames(conf_season) <- c("conf", "season", "teams")
+conf_season <- conf_season %>% mutate(conf=as.character(conf), season=as.numeric(as.character(season)),
+                                      teams=as.numeric(teams))
+
+# Select only regular games 2000 - 2019 with among conferences which are present in 2019
+conf_season <- conf_season %>% filter(season >= 2000 & season != 2020)
+conf_2019 <- (conf_season %>% filter(season == 2019 & teams > 0))$conf
+conf_season <- conf_season[conf_season$conf %in% conf_2019,] %>% filter(teams > 0)
+# Number of conferences for each year
+table(conf_season$season)
+
+
+
 ### Indicate Home Conference for a Team 
 
-# Select only 2020 data and replicate TeamID column
+# Select only 2019 data and replicate TeamID column
 df_TeamConferences <- df_TeamConferences %>% filter(Season == 2019) %>%
-  mutate(WTeamID=TeamID, LTeamID=TeamID) %>% select(-c(Season, TeamID))
+  mutate(WTeamID=TeamID, LTeamID=TeamID) %>% select(-c(Season))
+
 
 # Proportion of games played inside home confernces
 df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
@@ -512,8 +550,8 @@ df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% mutate(same
 sum(df_RegularSeasonCompactResults$same_conf) / nrow(df_RegularSeasonCompactResults)
 
 # Select only matches in the same conference
-df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(same_conf)
-
+# df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(same_conf)
+ 
 
 # Create dataframe with team-to-team wins and loses
 team_to_team_results <- df_RegularSeasonCompactResults %>% 
@@ -532,7 +570,7 @@ team_to_team_results <- team_to_team_results %>%
   replace_na(list(wins = 0, losses = 0)) %>% 
   mutate(win_perc = wins/(wins + losses) * 100) %>%
   # Select only teams with 10 or more games played between each other
-  filter(wins+losses>=1) %>%
+  filter(wins+losses>=2) %>%
   mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
 
 # Create edgelist between teams on the wins agains each other
@@ -547,31 +585,39 @@ colnames(edgelist_wteam_lteam)[3] <- 'weight'
 edgelist_wteam_lteam <- edgelist_wteam_lteam %>% left_join(df_TeamConferences %>% select(ConfAbbrev, WTeamID))
 
 # Change order of WTeamID and LTeamID
-edgelist_wteam_lteam <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID, weight, ConfAbbrev)
-
-
-
-
-### TODO: Plot on the same plot
+edgelist_wteam_lteam_regular <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID, weight, ConfAbbrev)
 
 # Create the network
-g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
+g_teams <- graph.data.frame(edgelist_wteam_lteam_regular, directed = T)
+
+
+# Add conference affilation
+temp_stats <- data.frame(TeamID=names(V(g_teams)))
+temp_stats$TeamID <- as.character(temp_stats$TeamID)
+df_TeamConferences$TeamID <- as.character(df_TeamConferences$TeamID)
+temp_stats <- temp_stats %>% left_join(df_TeamConferences %>% select(TeamID, ConfAbbrev))
+g_teams <- set_vertex_attr(graph=g_teams, name="conf_name", value=temp_stats$ConfAbbrev)
+
 
 # Remove disconnected components
 # g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
 
 # Plot the network
-vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.1
-plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.kamada.kawai, edge.width=E(g_teams)$weight * 0.1,
-            vertex.size=vertex_size, vertex.label=NA, vertex.color=as.factor(V(g_teams)$region_name))
+vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.15
+
+png("my_plot.png", 1600, 1600)
+plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.fruchterman.reingold, edge.width=E(g_teams)$weight * 0.01,
+            vertex.size=vertex_size, vertex.label=NA, edge.color=adjustcolor("lightgray", alpha.f = .5),
+            vertex.color=as.factor(V(g_teams)$conf_name)
+            )
+dev.off()
+
+# TODO: Group nodes closer based on the conferences
+# https://stackoverflow.com/questions/37378744/igraph-grouped-layout-based-on-attribute
 
 
-(length(V(g_teams)) * length(V(g_teams))) - length(V(g_teams))
 
-
-### TODO: Plot separatly
-
-# Create separate graph of matches for each conference
+### Create separate graph of matches for each conference
 conference_graphs_list <- list()
 confrence_names <- as.character(unique(edgelist_wteam_lteam$ConfAbbrev))
 
@@ -620,63 +666,32 @@ plot.igraph(G, edge.arrow.size=0.25, layout=layout.kamada.kawai, edge.width=E(G)
 
 
 
-
-### Plot the grid of the conference networks
-
-# Arrange based on the eigenvector centralization
-df_ConferencesNetworkStats <- df_ConferencesNetworkStats %>% arrange(-eigenvector_centralization)
-
-
-grid_list <- list()
-for(i in 1:nrow(df_ConferencesNetworkStats)){
-  
-  temp_g <- conference_graphs_list[[df_ConferencesNetworkStats$id[i]]]
-  
-  grid_list[[i]] <- ggnet2(temp_g, directed = TRUE, arrow.size = 8,
-                           node.size=as.numeric(eigen_centrality(temp_g, directed=T)$vector)) + 
-    guides(color = FALSE, size = FALSE) + theme(panel.background = element_rect(color = "grey50"))
-  
-}
-
-do.call(grid.arrange, grid_list)
-
-
 ### Plot the change in "competitiveness" of conferences over seasons. Time plot with lines.
 
+# TODO
 
 
 
-################ 2. NETWORK BASED ON THE TOURNEY RESULTS
 
 
-### 2.1. Add Home Region for a Team in 2019
 
-df_TourneySeeds <- read.csv('MDataFiles_Stage2/MNCAATourneySeeds.csv')
-df_Seasons <- read.csv('MDataFiles_Stage2/MSeasons.csv')
 
-# Add letter + season to tourney seeds
-df_TourneySeeds <- df_TourneySeeds %>% filter(Season >= 2015) %>%
-  mutate(region_letter=substr(as.character(Seed), 1, 1)) %>%
-  mutate(region_letter_season=paste(region_letter, Season, sep="_"))
 
-# Add region name from df_Seasons
-df_Seasons <- df_Seasons %>% filter(Season >= 2015 & Season != 2020) %>%
-  gather(region_letter, region_name, RegionW:RegionZ, factor_key=TRUE) %>%
-  mutate(region_letter=as.character(substr(region_letter, 7, 7))) %>%
-  mutate(region_letter_season=paste(region_letter, Season, sep="_")) %>%
-  select(region_letter_season, region_name)
-df_TourneySeeds <- df_TourneySeeds %>% left_join(df_Seasons)
 
-# TeamID and corresponding region
-team_region <- df_TourneySeeds %>% distinct(TeamID, .keep_all = TRUE) %>%
-  select(TeamID, region_name) %>% mutate(TeamID=as.character(TeamID))
+
+
+
+
+
+
+################ 2. NETWORK BASED ON THE TOURNEY AND REGULAR SEASON RESULTS FOR 2019. ERGM
 
 
 ### 2.2. Create the network
 
 # Select only 2015+ tourney results
 df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
-df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season >= 2015)
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season == 2019)
 
 # Create dataframe with team-to-team wins and loses
 team_to_team_results <- df_TourneyCompactResults %>% 
@@ -711,21 +726,36 @@ colnames(edgelist_wteam_lteam)[3] <- 'weight'
 edgelist_wteam_lteam$weight <- NULL
 
 # Change order of WTeam and LTeam
-edgelist_wteam_lteam <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID)
+edgelist_wteam_lteam_tourney <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID)
+
+
+
+# Combine regular and tourney results
+edgelist_wteam_lteam_regular <- edgelist_wteam_lteam_regular %>% select(LTeamID, WTeamID)
+
+edgelist_wteam_lteam_full <- rbind(edgelist_wteam_lteam_regular, edgelist_wteam_lteam_tourney)
+
+
+
 
 # Create the network
-g_teams <- graph.data.frame(edgelist_wteam_lteam, directed = T)
+g_teams <- graph.data.frame(edgelist_wteam_lteam_full, directed = T)
 
 # Remove disconnected components
-g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
+# g_teams <- induced_subgraph(g_teams, components(g_teams)$membership==1)
 
 # Add region affilation as node attribute
-temp_stats <- data.frame(TeamID=names(V(g_teams)))
-temp_stats$TeamID <- as.character(temp_stats$TeamID)
-temp_stats <- temp_stats %>% left_join(team_region)
-g_teams <- set_vertex_attr(graph=g_teams, name="region_name", value=temp_stats$region_name)
+# temp_stats <- data.frame(TeamID=names(V(g_teams)))
+# temp_stats$TeamID <- as.character(temp_stats$TeamID)
+# temp_stats <- temp_stats %>% left_join(team_region)
+# g_teams <- set_vertex_attr(graph=g_teams, name="region_name", value=temp_stats$region_name)
+
+
 
 # Add network statistics of a team based on the Network №1
+conference_graphs_list[[1]]
+
+
 temp_stats <- temp_stats %>%
   left_join(df_TeamsNetworkStats %>% mutate(TeamID=as.character(TeamID)))
 g_teams <- set_vertex_attr(graph=g_teams, name="mean_transitivity", value=temp_stats$mean_transitivity)
@@ -734,9 +764,9 @@ g_teams <- set_vertex_attr(graph=g_teams, name="pagerank_centralization", value=
 
 # Plot the network
 
-vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.5
-plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.circle, edge.width=0.01,
-            vertex.size=vertex_size, vertex.label=NA, vertex.color=as.factor(V(g_teams)$region_name))
+vertex_size <- as.numeric(strength(g_teams, mode="in")) * 0.2
+plot.igraph(g_teams, edge.arrow.size=0.05, layout=layout.fruchterman.reingold, edge.width=0.01,
+            vertex.size=vertex_size, vertex.label=NA)
 
 
 ### 2.3. ERGM specification
@@ -751,13 +781,17 @@ ergm_model.01 <- ergm(g_teams_net ~ edges)
 summary(ergm_model.01)
 
 # Model 2. Edges + Mutality
-ergm_model.02 <- ergm(g_teams_net ~ edges + mutual + nodefactor("region_name"))
+ergm_model.02 <- ergm(g_teams_net ~ edges + mutual)
 summary(ergm_model.02)
 
 # Model 3. Edges + Mutality + IVs
-ergm_model.03 <- ergm(g_teams_net ~ edges + mutual +
-                        nodefactor("region_name") + nodecov("mean_transitivity") +
-                        nodecov("betweenness_centralization") + nodecov("pagerank_centralization"))
+ergm_model.03 <- ergm(g_teams_net ~ mutual +
+                        nodecov("mean_transitivity") + 
+                        nodecov("betweenness_centralization") +
+                        nodecov("pagerank_centralization") + 
+                        absdiff("mean_transitivity") + 
+                        absdiff("betweenness_centralization") +
+                      absdiff("pagerank_centralization"))
 summary(ergm_model.03)
 
 

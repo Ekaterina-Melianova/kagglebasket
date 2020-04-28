@@ -1,0 +1,1279 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r Libraries}
+
+# general visualisation
+library('ggplot2') # visualisation
+library('scales') # visualisation
+library('patchwork') # visualisation
+library('RColorBrewer') # visualisation
+library('corrplot') # visualisation
+library('ggthemes') # visualisation
+library('ggrepel') # visualisation
+
+# general data manipulation
+library('dplyr') # data manipulation
+library('readr') # input/output
+library('vroom') # input/output
+library('skimr') # overview
+library('tibble') # data wrangling
+library('tidyr') # data wrangling
+library('stringr') # string manipulation
+library('forcats') # factor manipulation
+
+# specific visualisation
+library('alluvial') # visualisation
+library('ggrepel') # visualisation
+library('ggforce') # visualisation
+library('ggridges') # visualisation
+library('gganimate') # animations
+library('GGally') # visualisation
+library('ggExtra') # visualisation
+library('viridis') # visualisation
+library(gridExtra)
+library('usmap') # geo
+library("PerformanceAnalytics")
+library("pheatmap")
+
+# specific data manipulation
+library('lazyeval') # data wrangling
+library('broom') # data wrangling
+library('purrr') # data wrangling
+library('reshape2') # data wrangling
+library('rlang') # encoding
+library('kableExtra') # display
+library(tm)
+
+
+# networks
+library(igraph)
+library(GGally)
+library(ergm)
+library(intergraph)
+
+```
+
+
+# Data Loading
+
+```{r Data Loading. General dataframes}
+
+### 1.1. General dataframes
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
+
+# Load Players data
+df_Players <- read.csv('MPlayByPlay_Stage2/MPlayers.csv')
+
+# Load Team data
+df_Teams <- read.csv('MDataFiles_Stage2/MTeams.csv')
+df_TeamCoaches <- read.csv('MDataFiles_Stage2/MTeamCoaches.csv')
+df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
+df_TeamSpellings <- read.csv('MDataFiles_Stage2/MTeamSpellings.csv')
+
+# Load Cities data
+df_Cities <- read.csv('MDataFiles_Stage2/Cities.csv')
+df_GameCities <- read.csv('MDataFiles_Stage2/MGameCities.csv')
+
+# Public Rankings
+df_MasseyOrdinals <- read.csv('MDataFiles_Stage2/MMasseyOrdinals.csv')
+
+# Conferences
+df_Conferences <- read.csv('MDataFiles_Stage2/Conferences.csv')
+df_ConferencesTourneyGames <- read.csv('MDataFiles_Stage2/MConferenceTourneyGames.csv')
+
+# Tourney results
+df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
+df_TourneyDetailedResults <- read.csv('MDataFiles_Stage2/MNCAATourneyDetailedResults.csv')
+df_TourneySeedRoundSlots <- read.csv('MDataFiles_Stage2/MNCAATourneySeedRoundSlots.csv')
+df_TourneySeeds <- read.csv('MDataFiles_Stage2/MNCAATourneySeeds.csv')
+df_TourneySlots <- read.csv('MDataFiles_Stage2/MNCAATourneySlots.csv')
+
+# Secondary results
+df_SecondaryTourneyCompactResults <- read.csv('MDataFiles_Stage2/MSecondaryTourneyCompactResults.csv')
+df_SecondaryTourneyTeams <- read.csv('MDataFiles_Stage2/MSecondaryTourneyTeams.csv')
+
+# Regular Season results
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+df_RegularSeasonDetailedResults <- read.csv('MDataFiles_Stage2/MRegularSeasonDetailedResults.csv')
+
+# Seasons
+df_Seasons <- read.csv('MDataFiles_Stage2/MSeasons.csv')
+
+
+```
+
+
+
+```{r Data Loading. Play-by-play}
+
+play_by_play <- data.frame()
+
+# loop through each seasons PlayByPlay folders and read in in the play by play files
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
+
+#for(each in list.files()[str_detect(list.files(), "MEvents")]) {
+#  
+#  df <- read_csv(paste0(each))
+#  
+#  # Grouped shooting variables ----------------------------------------------
+#  # there are some shooting variables that can probably be condensed - tip ins and dunks
+##  paint_attempts_made <- c("made2_dunk", "made2_lay", "made2_tip") 
+#  paint_attempts_missed <- c("miss2_dunk", "miss2_lay", "miss2_tip") 
+#  paint_attempts <- c(paint_attempts_made, paint_attempts_missed)
+#  # create variables for field goals made, and also field goals attempted (which includes the sum of FGs made and FGs missed)
+#  FGM <- c("made2_dunk", "made2_jump", "made2_lay",  "made2_tip",  "made3_jump")
+#  FGA <- c(FGM, "miss2_dunk", "miss2_jump" ,"miss2_lay",  "miss2_tip",  "miss3_jump")
+#  # variable for three-pointers
+#  ThreePointer <- c("made3_jump", "miss3_jump")
+#  #  Two point jumper
+#  TwoPointJump <- c("miss2_jump", "made2_jump")
+#  # Free Throws
+#  FT <- c("miss1_free", "made1_free")
+#  # all shots
+#  AllShots <- c(FGA, FT)
+#  
+#  
+#  # Feature Engineering -----------------------------------------------------
+#  # paste the two even variables together for FGs as this is the format for last years comp data
+#  df <- df %>%
+#    mutate_if(is.factor, as.character) %>% 
+#    mutate(EventType = ifelse(str_detect(EventType, "miss") | str_detect(EventType, "made") | str_detect(EventType, "reb"), paste0(EventType, "_", EventSubType), EventType))
+#  
+#  # change the unknown for 3s to "jump" and for FTs "free"
+#  df <- df %>% 
+#    mutate(EventType = ifelse(str_detect(EventType, "3"), str_replace(EventType, "_unk", "_jump"), EventType),
+#           EventType = ifelse(str_detect(EventType, "1"), str_replace(EventType, "_unk", "_free"), EventType))
+#  
+#  
+#  df <- df %>% 
+#    # create a variable in the df for whether the attempts was made or missed
+#    mutate(shot_outcome = ifelse(grepl("made", EventType), "Made", ifelse(grepl("miss", EventType), "Missed", NA))) %>%
+#    # identify if the action was a field goal, then group it into the attempt types set earlier
+#    mutate(FGVariable = ifelse(EventType %in% FGA, "Yes", "No"),
+#           AttemptType = ifelse(EventType %in% paint_attempts, "PaintPoints", 
+#                                ifelse(EventType %in% ThreePointer, "ThreePointJumper", 
+#                                       ifelse(EventType %in% TwoPointJump, "TwoPointJumper", 
+#                                              ifelse(EventType %in% FT, "FreeThrow", "NoAttempt")))))
+#  
+#  
+#  # Rework DF so only shots are included and whatever lead to the shot --------
+#  df <- df %>% 
+#    mutate(GameID = paste(Season, DayNum, WTeamID, LTeamID, sep = "_")) %>% 
+#    group_by(GameID, ElapsedSeconds) %>% 
+#    mutate(EventType2 = lead(EventType),
+#           EventPlayerID2 = lead(EventPlayerID)) %>% ungroup()
+#  
+#  
+#  df <- df %>% 
+#    mutate(FGVariableAny = ifelse(EventType %in% FGA | EventType2 %in% FGA, "Yes", "No")) %>% 
+#    filter(FGVariableAny == "Yes") 
+#  
+#  
+#  # create a variable for if the shot was made, but then the second event was also a made shot
+#  df <- df %>% 
+#    mutate(Alert = ifelse(EventType %in% FGM & EventType2 %in% FGM, "Alert", "OK")) %>% 
+#    # only keep "OK" observations
+#    filter(Alert == "OK")
+#  
+#
+#  # replace NAs with somerhing
+#  df$EventType2[is.na(df$EventType2)] <- "no_second_event"
+#  
+#  
+#  # create a variable for if there was an assist on the FGM:
+#  df <- df %>% 
+#    mutate(AssistedFGM = ifelse(EventType %in% FGM & EventType2 == "assist", "Assisted", 
+#                                ifelse(EventType %in% FGM & EventType2 != "assist", "Solo", 
+#                                       ifelse(EventType %in% FGM & EventType2 == "no_second_event", "Solo", "None"))))
+#  
+#  # # because the FGA culd be either in `EventType` (more likely) or `EventType2` (less likely), need
+#  # # one variable to indicate the shot type
+#  # df <- df %>% \
+#  #   mutate(fg_type = ifelse(EventType %in% FGA, EventType, ifelse(EventType2 %in% FGA, EventType2, "Unknown")))
+#  
+#  # create final output
+#  df <- df %>% ungroup()
+#  play_by_play <- bind_rows(play_by_play, df)
+#  print(each)
+#  
+#  rm(df); gc()
+#}
+#
+#saveRDS(play_by_play, "play_by_play2015_19.rds")
+
+
+# Load preprocessed final play-by-play data
+#setwd("C:/Users/Artem/Google Drive/KAGGLE/March_Madness_Analytics_2020/MPlayByPlay_Stage2")
+play_by_play <- readRDS("play_by_play2015_19.rds")
+
+# Select Season
+play_by_play <- play_by_play[play_by_play$Season == 2019,]
+
+
+```
+
+
+# Part 1. Network of Players
+
+```{r Create Networks of assists for each team}
+
+################ 1. CREATE NETWORKS OF ASSISTS
+
+# Select only plays with assists
+play_by_play <- subset(play_by_play, EventType2 == "assist")
+
+# Create list with Team IDs
+team_ids <- unique(play_by_play$EventTeamID)
+
+# Remove missing team ids
+if(0 %in% team_ids){
+  team_ids <- team_ids[-which(team_ids == 0)]
+}
+
+
+createAssistsGraph <- function(team_id, play_by_play=play_by_play){
+
+  # Select only one team
+  play_by_play <- play_by_play[play_by_play$EventTeamID == team_id,]
+  
+  # Create edgeslist for one team, First column - assisted, Second column -  made a shot.
+  play_by_play$EventPlayerID2 <- as.character(play_by_play$EventPlayerID2)
+  play_by_play$EventPlayerID <- as.character(play_by_play$EventPlayerID)
+  edgelist <- play_by_play[,c("EventPlayerID2", "EventPlayerID")]
+  
+  ### Remove duplicated edges and add weights instead
+  # Create pair from each nodes in the edge
+  edgelist$pair <- paste(edgelist$EventPlayerID2, edgelist$EventPlayerID, sep = "_")
+  # Create dataframe with pairs and corresponding weights
+  pair_weights <- data.frame(table(edgelist$pair))
+  colnames(pair_weights) <- c("pair", 'weight')
+  pair_weights$pair <- as.character(pair_weights$pair)
+  # Remove duplicated edges
+  edgelist <- edgelist[!duplicated(edgelist$pair),]
+  # Add weights to the edgelist
+  edgelist <- edgelist %>% left_join(pair_weights, 'pair')
+  edgelist$pair <- NULL
+  
+  # Remove missing player ids
+  edgelist <- edgelist[!is.na(edgelist$EventPlayerID2),]
+  edgelist <- edgelist[!is.na(edgelist$EventPlayerID),]
+  
+  # Remove 0 player ids
+  edgelist <- edgelist[edgelist$EventPlayerID2 != 0,]
+  edgelist <- edgelist[edgelist$EventPlayerID != 0,]
+  
+  # Create graph from edgelist
+  G <- igraph::graph_from_edgelist(as.matrix(edgelist[c("EventPlayerID2", "EventPlayerID")]))
+  # Add weights
+  E(G)$weight <- edgelist$weight
+  
+  # Remove self loops
+  G <- igraph::simplify(G)
+  
+  return(G)
+}
+
+
+# Create assists graphs for all teams
+assist_graphs_list <- list()
+
+for(i in 1:length(team_ids)){
+  assist_graphs_list[[i]] <- createAssistsGraph(team_ids[i], play_by_play)
+}
+
+```
+
+
+## 1.1. Network statistics for the players.
+
+
+TODO: Plot one network as an example
+
+
+
+```{r Calculate set of network statistics for all players}
+
+calculatePlayerNetworkStatistics <- function(g){
+  
+  # 1. Players ids
+  player_ids <- names(V(g))
+  
+  # 2. Betweenness
+  betweenness_vec <- betweenness(g, normalized=T)
+  
+  # 3. Page Rank
+  pagerank_vec <- page.rank(g)$vector
+  pagerank_vec <- pagerank_vec/sum(pagerank_vec)
+  
+  
+  return(list(PlayerID=player_ids,
+              betweenness=betweenness_vec,
+              pagerank=pagerank_vec))
+}
+
+
+df_PlayersNetworkStats <- lapply(assist_graphs_list, calculatePlayerNetworkStatistics)
+df_PlayersNetworkStats <- do.call(rbind.data.frame, df_PlayersNetworkStats)
+df_PlayersNetworkStats <- df_PlayersNetworkStats %>% mutate(PlayerID=as.character(PlayerID))
+
+# Add full names of players to df with network stats
+df_Players <- df_Players %>% mutate(FullName=paste(FirstName, LastName),
+                                    PlayerID=as.character(PlayerID))
+df_PlayersNetworkStats <- df_PlayersNetworkStats %>%
+  left_join(df_Players %>% select(PlayerID, FullName))
+
+```
+
+```{r Plot. TOP 15 Players with highest PageRank, fig.height=5, fig.width=8}
+
+# TOP 15 Players with highest PageRank
+df_PlayersNetworkStats %>% arrange(-pagerank) %>% head(15) %>% 
+  ggplot(aes(reorder(FullName, pagerank), pagerank)) +
+  geom_col(fill="lightcoral") + scale_y_continuous(limits = c(0.2,0.26), oob=rescale_none) +
+  coord_flip() + theme_classic(base_size = 14) + ggtitle("TOP-15 Players by PageRank centrality in team") + 
+  labs(y="PageRank", x = "Player") + 
+  theme(plot.title = element_text(size = 18))
+
+```
+
+```{r Plot. TOP 15 Players with highest Betweenness, fig.height=5, fig.width=8}
+
+# TOP 15 Players with highest Betweenness
+df_PlayersNetworkStats %>% arrange(-betweenness) %>% head(15) %>% 
+  ggplot(aes(reorder(FullName, betweenness), betweenness)) +
+  geom_col(fill="lightblue3") + scale_y_continuous(limits = c(0.4,0.6), oob=rescale_none) +
+  coord_flip() + theme_classic(base_size = 14) + ggtitle("TOP-15 Players by Betweenness centrality in team") + 
+  labs(y="Betweenness", x = "Player") + 
+  theme(plot.title = element_text(size = 18))
+
+```
+
+
+## 1.2. Network statistics (centralization) for the teams.
+
+```{r Calculate set of network statistics for all teams, include=FALSE}
+
+calculateTeamNetworkStatistics <- function(g){
+  
+  # 1. Clustering coefficent (transitivity)
+  mean_transitivity <- mean(transitivity(g, "weighted"), na.rm=T)
+  
+  # 2. Betweenness
+  betweenness_vec <- betweenness(g, normalized=T)
+  
+  # 3. Closeness
+  closeness_vec <- closeness(g, normalized=T, mode="in")
+  
+  # 4. Page Rank
+  pagerank_vec <- page.rank(g)$vector
+  pagerank_vec <- pagerank_vec/sum(pagerank_vec)
+  
+  # 5. EigenVector centrality
+  eigenvector_vec <- as.numeric(eigen_centrality(g, directed=T)$vector)
+  
+  # 6. Centralization metrics
+  betweenness_centralization <- centralize(betweenness_vec, normalized = F)
+  closeness_centralization <- centralize(closeness_vec, normalized = F)
+  pagerank_centralization <- centralize(pagerank_vec, normalized = F)
+  eigenvector_centralization <- centralize(eigenvector_vec, normalized = F)
+  
+  
+  return(list(mean_transitivity=mean_transitivity,
+              betweenness_centralization=betweenness_centralization,
+              closeness_centralization=closeness_centralization,
+              pagerank_centralization=pagerank_centralization,
+              eigenvector_centralization=eigenvector_centralization))
+}
+
+
+df_TeamsNetworkStats <- lapply(assist_graphs_list, calculateTeamNetworkStatistics)
+df_TeamsNetworkStats <- do.call(rbind.data.frame, df_TeamsNetworkStats)
+
+# Add team_id
+df_TeamsNetworkStats$TeamID <- team_ids
+
+# Add mean rank for the team in that season
+df_MasseyOrdinals_pom <- subset(df_MasseyOrdinals, SystemName=="POM" & Season==2019) %>%
+  select(TeamID, RankingDayNum, OrdinalRank) %>% group_by(TeamID) %>%
+  summarize(median_rank=median(OrdinalRank)) %>% data.frame()
+
+# Add ranking to the teams stats
+df_TeamsNetworkStats <- left_join(df_TeamsNetworkStats, df_MasseyOrdinals_pom, by="TeamID")
+
+# Add team names to the dataframe
+df_TeamsNetworkStats <- df_TeamsNetworkStats %>% left_join(df_Teams %>% select(TeamID, TeamName))
+
+
+```
+
+
+
+### Example of teams with High and Low PageRank centralization.
+
+
+```{r 1. Plot with example of Highest PageRank centralizations, fig.height=6, fig.width=6}
+
+# 1. Example of the network with Biggest PageRank centralization
+
+# Create the graph
+G <- assist_graphs_list[[which.max(df_TeamsNetworkStats$pagerank_centralization)]]
+G_name <- as.character(df_TeamsNetworkStats[which.max(df_TeamsNetworkStats$pagerank_centralization),]$TeamName)
+
+# Set vertex size end edge width for plotting
+vertex_size <- page.rank(G)$vector * 100
+vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.3
+# Add player names
+vertex_ids <- data.frame(PlayerID=names(V(G)))
+vertex_fullnames <- (vertex_ids %>% left_join(df_Players %>% select(PlayerID, FullName)))$FullName
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>10, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=1.2,
+            vertex.color=ifelse(vertex_size>10, "lightcoral", "gray45"),
+            main=paste(G_name, '\n Team with Highest PageRank Centralization'))
+
+```
+
+
+```{r 2. Plot with example of Lowest PageRank centralizations, fig.height=6, fig.width=6}
+
+# 2. Example of the network with Lowest PageRank centralization
+
+# Create the graph
+G <- assist_graphs_list[[which.min(df_TeamsNetworkStats$pagerank_centralization)]]
+G_name <- as.character(df_TeamsNetworkStats[which.min(df_TeamsNetworkStats$pagerank_centralization),]$TeamName)
+
+# Set vertex size end edge width for plotting
+vertex_size <- page.rank(G)$vector * 100
+vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.3
+# Add player names
+vertex_ids <- data.frame(PlayerID=names(V(G)))
+vertex_fullnames <- (vertex_ids %>% left_join(df_Players %>% select(PlayerID, FullName)))$FullName
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>7, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=0.8,
+            vertex.color=ifelse(vertex_size>7, "lightcoral", "gray45"),
+            main=paste(G_name, '\n Team with Lowest PageRank Centralization'))
+
+```
+
+
+### Example of teams with High and Low Betweenness centralization.
+
+
+```{r 3. Plot with example of Highest Betweenness centralization, fig.height=6, fig.width=6}
+
+# 3. Example of the network with Highest Betweenness centralization
+
+# Create the graph
+G <- assist_graphs_list[[which.max(df_TeamsNetworkStats$betweenness_centralization)]]
+G_name <- as.character(df_TeamsNetworkStats[which.max(df_TeamsNetworkStats$betweenness_centralization),]$TeamName)
+
+# Set vertex size end edge width for plotting
+vertex_size <- as.numeric(betweenness(G, normalized=T))*50
+vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.3
+# Add player names
+vertex_ids <- data.frame(PlayerID=names(V(G)))
+vertex_fullnames <- (vertex_ids %>% left_join(df_Players %>% select(PlayerID, FullName)))$FullName
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>20, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=1.2,
+            vertex.color=ifelse(vertex_size>20, "lightblue3", "gray45"),
+            main=paste(G_name, '\n Team with Highest Betweenness Centralization'))
+
+```
+
+
+```{r 4. Plot with example of Lowest Betweenness centralization, fig.height=6, fig.width=6}
+
+# 4. Example of the network with Lowest Betweenness centralization
+
+# Create the graph
+G <- assist_graphs_list[[which.min(df_TeamsNetworkStats$betweenness_centralization)]]
+G_name <- as.character(df_TeamsNetworkStats[which.min(df_TeamsNetworkStats$betweenness_centralization),]$TeamName)
+
+# Set vertex size end edge width for plotting
+vertex_size <- as.numeric(betweenness(G, normalized=T))*50
+vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.15
+# Add player names
+vertex_ids <- data.frame(PlayerID=names(V(G)))
+vertex_fullnames <- (vertex_ids %>% left_join(df_Players %>% select(PlayerID, FullName)))$FullName
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>5, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=0.8,
+            vertex.color=ifelse(vertex_size>5, "lightblue3", "gray45"),
+            main=paste(G_name, '\n Team with Lowest Betweenness Centralization'))
+
+```
+
+
+
+### Linear regression with Centralization metrics as IV and Median Rank during the season as DV.
+
+
+```{r Linear Regression with network statisitcs as IV and Median Rank as DV}
+
+# TODO: Number of wins instead of median rank?
+
+summary(lm(median_rank ~ mean_transitivity + betweenness_centralization + 
+             closeness_centralization + pagerank_centralization,
+       df_TeamsNetworkStats))
+
+```
+
+
+
+
+# Part 2. Network of Teams
+
+```{r Data Loading}
+
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
+
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
+
+
+```
+
+
+## 2.1. Competitiveness inside conferences
+
+
+```{r Create separate graph of matches in each conference, include=FALSE}
+
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
+
+# Select only 2019 data and replicate TeamID column
+df_TeamConferences <- df_TeamConferences %>% filter(Season == 2019) %>%
+  mutate(WTeamID=TeamID, LTeamID=TeamID) %>% select(-c(Season))
+
+
+# Proportion of games played inside home confernces
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season == 2019)
+
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>%
+  left_join(df_TeamConferences %>% select(c(ConfAbbrev, WTeamID))) %>% rename(WConfAbbrev=ConfAbbrev) %>%
+  left_join(df_TeamConferences %>% select(c(ConfAbbrev, LTeamID))) %>% rename(LConfAbbrev=ConfAbbrev)
+
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% mutate(same_conf=WConfAbbrev==LConfAbbrev)
+
+# Proportion
+sum(df_RegularSeasonCompactResults$same_conf) / nrow(df_RegularSeasonCompactResults)
+
+# Select only matches in the same conference
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(same_conf)
+
+# Create dataframe with team-to-team wins and loses
+team_to_team_results <- df_RegularSeasonCompactResults %>% 
+  # filter(Season >= 2009) %>% 
+  count(WTeamID, LTeamID) %>% 
+  arrange(desc(n)) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("WTeamID" = "TeamID")) %>% 
+  rename(WTeamName = TeamName) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("LTeamID" = "TeamID")) %>% 
+  rename(LTeamName = TeamName)
+team_to_team_results <- team_to_team_results %>%
+  # select(-ends_with("ID")) %>% 
+  rename(wins = n) %>% 
+  left_join(team_to_team_results %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
+  rename(losses = n) %>% 
+  replace_na(list(wins = 0, losses = 0)) %>% 
+  mutate(win_perc = wins/(wins + losses) * 100) %>%
+  # Select only teams with 10 or more games played between each other
+  filter(wins+losses>=1) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
+
+# Create edgelist between teams on the wins agains each other
+edgelist_wteam_lteam <- df_RegularSeasonCompactResults %>% 
+  count(WTeamID, LTeamID) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_")) %>%
+  filter(WTeamID_LTeamID %in% team_to_team_results$WTeamID_LTeamID) %>% 
+  select(-c(WTeamID_LTeamID))
+colnames(edgelist_wteam_lteam)[3] <- 'weight'
+
+# Add conference name to edgelist
+edgelist_wteam_lteam <- edgelist_wteam_lteam %>% left_join(df_TeamConferences %>% select(ConfAbbrev, WTeamID))
+
+# Change order of WTeamID and LTeamID
+edgelist_wteam_lteam_regular <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID, weight, ConfAbbrev)
+
+
+### Create separate graph of matches for each conference
+conference_graphs_list <- list()
+confrence_names <- as.character(unique(edgelist_wteam_lteam$ConfAbbrev))
+
+for(i in 1:length(confrence_names)){
+  
+  conf_edgelist <- edgelist_wteam_lteam %>% filter(ConfAbbrev == confrence_names[i])
+  conference_graphs_list[[i]] <- graph.data.frame(conf_edgelist, directed = T)
+  
+}
+
+
+### Calculate the EigenVector centralization for each conference
+
+calculateConferenceNetworkStatistics <- function(g){
+  
+  # 1. EigenVector centrality
+  eigenvector_vec <- as.numeric(eigen_centrality(g, directed=T)$vector)
+  
+  # 2. Centralization metrics
+  eigenvector_centralization <- centralize(eigenvector_vec, normalized = F)
+  
+  return(list(eigenvector_centralization=eigenvector_centralization))
+}
+
+
+df_ConferencesNetworkStats <- lapply(conference_graphs_list, calculateConferenceNetworkStatistics)
+df_ConferencesNetworkStats <- do.call(rbind.data.frame, df_ConferencesNetworkStats)
+
+# Add team_id
+df_ConferencesNetworkStats$conference_name <- confrence_names
+# Add graph_list number
+df_ConferencesNetworkStats$id <- 1:nrow(df_ConferencesNetworkStats)
+
+# Add fullnames names of the conferences
+df_ConferencesNetworkStats$conference_name
+df_ConferencesNetworkStats <- df_ConferencesNetworkStats %>% left_join(df_Conferences,by = c("conference_name"="ConfAbbrev"))
+df_ConferencesNetworkStats <- df_ConferencesNetworkStats %>% rename(conference_fullname=Description)
+df_ConferencesNetworkStats$conference_fullname <- as.character(df_ConferencesNetworkStats$conference_fullname)
+
+# Remove "Conference" word
+df_ConferencesNetworkStats$conference_fullname <- removeWords(df_ConferencesNetworkStats$conference_fullname, " Conference")
+
+
+```
+
+
+```{r Plot. Ranking of the conferences according to competitiveness, fig.height=6, fig.width=8}
+
+df_ConferencesNetworkStats %>% arrange(-eigenvector_centralization) %>% 
+  ggplot(aes(reorder(conference_fullname, eigenvector_centralization), eigenvector_centralization, fill=eigenvector_centralization)) +
+  geom_col() +
+  coord_flip() + theme_classic(base_size = 14) + ggtitle("Conferences by competitiveness in 2019") + 
+  labs(y="EigenVector centralization", x = "Conference") + 
+  theme(plot.title = element_text(size = 18))
+
+```
+
+
+```{r 1. Plot with example of Highest EigenVector centralizations, fig.height=6, fig.width=6}
+
+# 1. Example of the network with Highest PageRank centralization
+
+# Create the graph
+G <- conference_graphs_list[[which.max(df_ConferencesNetworkStats$eigenvector_centralization)]]
+G_name <- as.character(df_ConferencesNetworkStats[which.max(df_ConferencesNetworkStats$eigenvector_centralization),]$conference_fullname)
+
+# Set vertex size end edge width for plotting
+vertex_size <- as.numeric(eigen_centrality(G, directed=T)$vector) * 50
+# vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.3
+
+# Add team names
+vertex_ids <- data.frame(TeamID=names(V(G)))
+df_Teams$TeamID <- as.character(df_Teams$TeamID)
+vertex_ids <- vertex_ids %>% left_join(df_Teams %>% select(TeamID, TeamName))
+vertex_fullnames <- as.character(vertex_ids$TeamName)
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>30, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=1.2,
+            vertex.color=ifelse(vertex_size>30, "lightcoral", "gray45"),
+            main=paste(G_name, '\n Conference with Highest EigenVector Centralization'))
+
+
+```
+
+
+
+
+
+Heatmap with change of Competitiveness over time
+
+```{r Preprocessing for time comparision, include=FALSE}
+
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
+
+df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+
+### Conferences and seasons. Select for time-series plots
+conf_season <- data.frame(table(df_TeamConferences$ConfAbbrev, df_TeamConferences$Season))
+colnames(conf_season) <- c("conf", "season", "teams")
+conf_season <- conf_season %>% mutate(conf=as.character(conf), season=as.numeric(as.character(season)),
+                                      teams=as.numeric(teams))
+
+# Select only regular games 2000 - 2019 with among conferences which are present in 2019
+conf_season <- conf_season %>% filter(season >= 2000 & season != 2020)
+conf_2019 <- (conf_season %>% filter(season == 2019 & teams > 0))$conf
+conf_season <- conf_season[conf_season$conf %in% conf_2019,] %>% filter(teams > 0)
+# Number of conferences for each year
+# table(conf_season$season)
+
+# Selected conferences
+selected_conferences <- unique(conf_season$conf)
+
+
+### Calculate the EigenVector centralization for each conference
+
+calculateConferenceNetworkStatistics <- function(g){
+  
+  # 1. EigenVector centrality
+  eigenvector_vec <- as.numeric(eigen_centrality(g, directed=T)$vector)
+  
+  # 2. Centralization metrics
+  eigenvector_centralization <- centralize(eigenvector_vec, normalized = F)
+  
+  return(list(eigenvector_centralization=eigenvector_centralization))
+}
+
+
+confernces_stats_seasons_list <- list()
+
+for (conf_i in 1:length(unique(conf_season$season))){
+
+  # Select only 2019 data and replicate TeamID column
+  df_TeamConferences_ <- df_TeamConferences %>% filter(Season == unique(conf_season$season)[conf_i]) %>%
+    mutate(WTeamID=TeamID, LTeamID=TeamID) %>% select(-c(Season))
+  
+  # Proportion of games played inside home confernces
+  df_RegularSeasonCompactResults_ <- df_RegularSeasonCompactResults %>% filter(Season == unique(conf_season$season)[conf_i])
+  
+  df_RegularSeasonCompactResults_ <- df_RegularSeasonCompactResults_ %>%
+    left_join(df_TeamConferences_ %>% select(c(ConfAbbrev, WTeamID))) %>% rename(WConfAbbrev=ConfAbbrev) %>%
+    left_join(df_TeamConferences_ %>% select(c(ConfAbbrev, LTeamID))) %>% rename(LConfAbbrev=ConfAbbrev)
+  
+  df_RegularSeasonCompactResults_ <- df_RegularSeasonCompactResults_ %>% mutate(same_conf=WConfAbbrev==LConfAbbrev)
+  
+  # Select only matches in the same conference
+  df_RegularSeasonCompactResults_ <- df_RegularSeasonCompactResults_ %>% filter(same_conf)
+  
+  # Create dataframe with team-to-team wins and loses
+  team_to_team_results <- df_RegularSeasonCompactResults_ %>% 
+    # filter(Season >= 2009) %>% 
+    count(WTeamID, LTeamID) %>% 
+    arrange(desc(n)) %>% 
+    left_join(df_Teams %>% select(TeamID, TeamName), by = c("WTeamID" = "TeamID")) %>% 
+    rename(WTeamName = TeamName) %>% 
+    left_join(df_Teams %>% select(TeamID, TeamName), by = c("LTeamID" = "TeamID")) %>% 
+    rename(LTeamName = TeamName)
+  team_to_team_results <- team_to_team_results %>%
+    # select(-ends_with("ID")) %>% 
+    rename(wins = n) %>% 
+    left_join(team_to_team_results %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
+    rename(losses = n) %>% 
+    replace_na(list(wins = 0, losses = 0)) %>% 
+    mutate(win_perc = wins/(wins + losses) * 100) %>%
+    # Select only teams with 10 or more games played between each other
+    filter(wins+losses>=1) %>%
+    mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
+  
+  # Create edgelist between teams on the wins agains each other
+  edgelist_wteam_lteam <- df_RegularSeasonCompactResults_ %>% 
+    count(WTeamID, LTeamID) %>%
+    mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_")) %>%
+    filter(WTeamID_LTeamID %in% team_to_team_results$WTeamID_LTeamID) %>% 
+    select(-c(WTeamID_LTeamID))
+  colnames(edgelist_wteam_lteam)[3] <- 'weight'
+  
+  # Add conference name to edgelist
+  edgelist_wteam_lteam <- edgelist_wteam_lteam %>% left_join(df_TeamConferences_ %>% select(ConfAbbrev, WTeamID))
+  
+  # Change order of WTeamID and LTeamID
+  edgelist_wteam_lteam_regular <- edgelist_wteam_lteam %>% select(LTeamID, WTeamID, weight, ConfAbbrev)
+  
+  
+  ### Create separate graph of matches for each conference
+  conference_graphs_list <- list()
+  confrence_names <- as.character(unique(edgelist_wteam_lteam$ConfAbbrev))
+  
+  for(i in 1:length(confrence_names)){
+    
+    conf_edgelist <- edgelist_wteam_lteam %>% filter(ConfAbbrev == confrence_names[i])
+    conference_graphs_list[[i]] <- graph.data.frame(conf_edgelist, directed = T)
+    
+  }
+  
+  df_ConferencesNetworkStats <- lapply(conference_graphs_list, calculateConferenceNetworkStatistics)
+  df_ConferencesNetworkStats <- do.call(rbind.data.frame, df_ConferencesNetworkStats)
+  
+  # Add team_id
+  df_ConferencesNetworkStats$conference_name <- confrence_names
+  # Add graph_list number
+  df_ConferencesNetworkStats$id <- 1:nrow(df_ConferencesNetworkStats)
+  
+  # Add season year
+  df_ConferencesNetworkStats$season <- unique(conf_season$season)[conf_i]
+  
+  # Add conferences stats to the list
+  confernces_stats_seasons_list[[conf_i]] <- df_ConferencesNetworkStats
+   
+  print(conf_i)
+  
+}
+
+
+df_conferences_stats_seasons <- do.call(rbind.data.frame, confernces_stats_seasons_list)
+
+
+# Select only conferences which were present in 2019
+df_conferences_stats_seasons <- df_conferences_stats_seasons %>% filter(conference_name %in% selected_conferences)
+
+# Select only conferences with full years
+selected_conferences_2000 <- (df_conferences_stats_seasons %>% filter(season == 2000))$conference_name
+df_conferences_stats_seasons <- df_conferences_stats_seasons %>% filter(conference_name %in% selected_conferences_2000) 
+df_conferences_stats_seasons <- df_conferences_stats_seasons %>% select(-c(id))
+
+```
+
+```{r Plot the heatmap with Conferences and Seasons competitiveness}
+
+heatmap_comp <- spread(df_conferences_stats_seasons, season, eigenvector_centralization)
+rownames(heatmap_comp) <- heatmap_comp$conference_name
+heatmap_comp <- as.matrix(heatmap_comp %>% select(-c(conference_name)))
+
+
+pheatmap(heatmap_comp, cluster_cols = F, angle_col=45, main="Competitiveness in Conferences for the past 20 years")
+
+```
+
+
+## 2.2. ERGM based on the Regular + Tourney games in 2019.
+
+```{r Create joint graph of all games (Regular, Tourney)}
+
+setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
+
+# Load Tourney results in 2019
+df_TourneyCompactResults <- read.csv('MDataFiles_Stage2/MNCAATourneyCompactResults.csv')
+df_TourneyCompactResults <- df_TourneyCompactResults %>% filter(Season == 2019) %>%
+  select(WTeamID, LTeamID)
+
+# Load Regular Season results in 2019
+df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season == 2019) %>%
+  select(WTeamID, LTeamID)
+
+# Combine Regular and Tourney results
+df_FullCompactResults <- rbind(df_TourneyCompactResults, df_RegularSeasonCompactResults)
+
+
+
+# Create dataframe with team-to-team wins and loses
+team_to_team_results_full <- df_FullCompactResults %>% 
+  # filter(Season >= 2009) %>% 
+  count(WTeamID, LTeamID) %>% 
+  arrange(desc(n)) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("WTeamID" = "TeamID")) %>% 
+  rename(WTeamName = TeamName) %>% 
+  left_join(df_Teams %>% select(TeamID, TeamName), by = c("LTeamID" = "TeamID")) %>% 
+  rename(LTeamName = TeamName)
+
+team_to_team_results_full <- team_to_team_results_full %>%
+  # select(-ends_with("ID")) %>% 
+  rename(wins = n) %>% 
+  left_join(team_to_team_results_full %>% select(-ends_with("ID")), by = c("WTeamName" = "LTeamName", "LTeamName" = "WTeamName")) %>% 
+  rename(losses = n) %>% 
+  replace_na(list(wins = 0, losses = 0)) %>% 
+  mutate(win_perc = wins/(wins + losses) * 100) %>%
+  # Select only teams with 10 or more games played between each other
+  filter(wins+losses>=1) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_"))
+
+# Create edgelist between teams on the wins agains each other
+edgelist_wteam_lteam_full <- df_FullCompactResults %>% 
+  count(WTeamID, LTeamID) %>%
+  mutate(WTeamID_LTeamID=paste(as.character(WTeamID), as.character(LTeamID), sep="_")) %>%
+  filter(WTeamID_LTeamID %in% team_to_team_results_full$WTeamID_LTeamID) %>% 
+  select(-c(WTeamID_LTeamID))
+colnames(edgelist_wteam_lteam_full)[3] <- 'weight'
+
+# Drop weights
+edgelist_wteam_lteam_full$weight <- NULL
+
+# Change order of WTeam and LTeam
+edgelist_wteam_lteam_full <- edgelist_wteam_lteam_full %>% select(LTeamID, WTeamID)
+
+# Create the network
+g_teams_full <- graph.data.frame(edgelist_wteam_lteam_full, directed = T)
+
+# Add conference affilation
+temp_stats <- data.frame(TeamID=names(V(g_teams_full)))
+temp_stats$TeamID <- as.character(temp_stats$TeamID)
+df_TeamConferences$TeamID <- as.character(df_TeamConferences$TeamID)
+temp_stats <- temp_stats %>% left_join(df_TeamConferences %>% select(TeamID, ConfAbbrev))
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="conf_name", value=temp_stats$ConfAbbrev)
+
+
+```
+
+
+```{r Plot network of all matches in 2019, fig.height=15, fig.width=15}
+
+# TODO: Add color according to some advanced statistic of the team as an example.
+
+# Plot the network
+vertex_size <- as.numeric(strength(g_teams_full, mode="in")) * 0.2
+plot.igraph(g_teams_full, edge.arrow.size=0.05, layout=layout.fruchterman.reingold, edge.width=0.01,
+            vertex.size=vertex_size, vertex.label=NA)
+
+```
+
+```{r Calculate advanced statistics about each team}
+
+# Combine regular season and tourney
+df_FullDetailedResults <- rbind(df_RegularSeasonDetailedResults, df_TourneyDetailedResults) %>%
+  filter(Season == 2019)
+
+## calculate possessions per game statistic: field goal attempts + 0.475 x free throw attempts - offensive rebounds + turnovers
+
+
+# regular season
+season_stats <- df_FullDetailedResults %>%
+  mutate(WPoss = WFGA + (WFTA * 0.475) + WTO - WOR,
+         LPoss = LFGA + (LFTA * 0.475) + LTO - LOR)
+
+
+
+#---------- tidy data for regular season totals ----------#
+
+# First I will define a function that will take the detailed results data and reshape it so that it results in a dataframe where 
+# each observation is a team for that season and their totals statistics for that season. It will also calculate the statistics allowed
+# for the season. This function only requires one parameter to be passed to it: either the regular season or Tourney detailed data.
+
+# IMPORTANT: #
+# The data required for this function to work is either the regular season or tourney detailed stats, and the "teams" dataset
+
+reshape_detailed_results <- function(detailed_dataset) {
+  
+  season_team_stats_tot <- rbind(
+    detailed_dataset %>%
+      select(Season, DayNum, TeamID=WTeamID, Score=WScore, OScore=LScore, WLoc, NumOT, Poss=WPoss, FGM=WFGM, FGA=WFGA, FGM3=WFGM3,  FGA3=WFGA3, FTM=WFTM, FTA=WFTA, OR=WOR,
+             DR=WDR, Ast=WAst, TO=WTO, Stl=WStl, Blk=WBlk, PF=WPF, OPoss=LPoss, OFGM=LFGM, OFGA=LFGA, OFGM3=LFGM3, OFGA3=LFGA3, OFTM=LFTM, OFTA=LFTA, O_OR=LOR, ODR=LDR,
+             OAst=LAst, OTO=LTO, OStl=LStl, OBlk=LBlk, OPF=LPF) %>%
+      mutate(Winner=1),
+    
+    detailed_dataset %>%
+      select(Season, DayNum, TeamID=LTeamID, Score=LScore, OScore=WScore, WLoc, NumOT, Poss=LPoss, FGM=LFGM, FGA=LFGA, FGM3=LFGM3,  FGA3=LFGA3, FTM=LFTM, FTA=LFTA, OR=LOR,
+             DR=LDR, Ast=LAst, TO=LTO, Stl=LStl, Blk=LBlk, PF=LPF, OPoss=WPoss, OFGM=WFGM, OFGA=WFGA, OFGM3=WFGM3, OFGA3=WFGA3, OFTM=WFTM, OFTA=WFTA, O_OR=WOR, ODR=WDR,
+             OAst=WAst, OTO=WTO, OStl=WStl, OBlk=WBlk, OPF=WPF) %>%
+      mutate(Winner=0)) %>%
+    group_by(Season, TeamID) %>%
+    summarise(GP = n(),
+              wins = sum(Winner),
+              TotPoints = sum(Score),
+              TotPointsAllow = sum(OScore),
+              NumOT = sum(NumOT),
+              TotPos = sum(Poss),
+              TotFGM = sum(FGM),
+              TotFGA = sum(FGA),
+              TotFGM3 = sum(FGM3),
+              TotFGA3 = sum(FGA3),
+              TotFTM = sum(FTM),
+              TotFTA = sum(FTA),
+              TotOR = sum(OR),
+              TotDR = sum(DR),
+              TotAst = sum(Ast),
+              TotTO = sum(TO),
+              TotStl = sum(Stl),
+              TotBlk = sum(Blk),
+              TotPF = sum(PF),
+              TotPossAllow = sum(OPoss),
+              TotFGMAllow = sum(OFGM),
+              TotFGAAllow = sum(OFGA),
+              TotFGM3Allow = sum(OFGM3),
+              TotFGA3Allow = sum(OFGA3),
+              TotFTMAllow = sum(OFTM),
+              TotFTAAllow = sum(OFTA),
+              TotORAllow = sum(O_OR),
+              TotDRAllow = sum(ODR),
+              TotAstAllow = sum(OAst),
+              TotTOAllow = sum(OTO),
+              TotStlAllow = sum(OStl),
+              TotBlkAllow = sum(OBlk),
+              TotPFAllow = sum(OPF))
+  
+}
+
+## Store the results to a dataframe
+season_team_stats_tot <- reshape_detailed_results(season_stats)
+
+## calculate win percentage
+season_team_stats_tot$WinPerc <- season_team_stats_tot$wins / season_team_stats_tot$GP
+
+
+
+#---------- Create a dataframe of season averages for each team ----------#
+
+# Next I will define a function that takes in the totals dataframe from the above function and calculate a season averages dataset.
+# this function also only requires one parameter to be passed to it, the totals dataframe.
+
+calculate_detailed_averages <- function(totals_dataframe) {
+  
+  averages <- totals_dataframe
+  
+  cols <- names(averages[,c(5:35)])
+  
+  for (eachcol in cols) {
+    averages[,eachcol] <- round(averages[,eachcol] / averages$GP,2)
+    
+  }
+  
+  averages <- averages %>%
+    rename(AvgPoints = TotPoints, AvgPointsAllow=TotPointsAllow, AvgOT=NumOT, AvgPoss=TotPos, AvgFGM=TotFGM,  AvgFGA=TotFGA, AvgFGM3=TotFGM3, AvgFGA3=TotFGA3, AvgFTM=TotFTM,
+           AvgFTA=TotFTA, AvgOR=TotOR, Avg_DR=TotDR, AvgAst=TotAst, AvgTO=TotTO, AvgStl=TotStl, Avg_Blk=TotBlk, AvgPF=TotPF, AvgPossAllow=TotPossAllow, AvgFGMAllow=TotFGMAllow, 
+           AvgFGAAllow=TotFGAAllow,  AvgFGM3Allow=TotFGM3Allow, AvgFGA3Allow=TotFGA3Allow,  AvgFTMAllow=TotFTMAllow, AvgFTAAllow=TotFTAAllow, 
+           AvgORAllow=TotORAllow, AvgDRAllow=TotDRAllow,  AvgAstAllow=TotAstAllow, AvgTOAllow=TotTOAllow, AvgStlAllow=TotStlAllow,  AvgBlkAllow=TotBlkAllow,
+           AvgPFAllow=TotPFAllow) %>%
+    mutate(PointsPerPoss = AvgPoints / AvgPoss,
+           PointsPerPossAllow = AvgPointsAllow / AvgPossAllow)
+  
+  return(averages)
+  
+}
+
+
+# create an averages dataframe
+season_team_stats_averages <- calculate_detailed_averages(season_team_stats_tot)
+
+
+
+#---------- Create a dataframe of advanved stats for each team ----------#
+
+# Create advanved stats dataframe
+advanced_stats_season <- season_team_stats_tot %>%
+  mutate(WinPerc = wins / GP,
+         OffRtg = 100 * (TotPoints / TotPos),
+         DefRtg = 100 * (TotPointsAllow / TotPossAllow),
+         SoS = OffRtg - DefRtg,
+         Pie = TotPoints + TotFGM + TotFTM - TotFGA - TotFTA + TotDR + (0.5 * TotOR) + TotAst + TotStl + (0.5 * TotBlk) - TotPF - TotTO,
+         OPie = TotPointsAllow + TotFGMAllow + TotFTMAllow - TotFGAAllow - TotFTAAllow + TotDRAllow + (0.5 * TotORAllow) + TotAstAllow + TotStlAllow + (0.5 * TotBlkAllow) - TotPFAllow - TotTOAllow,
+         Tie = Pie / (Pie + OPie) * 100,
+         AstRatio = 100 * TotAst / (TotFGA + (0.475 * TotFTA) + TotAst + TotTO),
+         TORatio = 100 * TotTO / (TotFGA + (0.475 * TotFTA) + TotAst + TotTO),
+         TSPerc = 100 * TotPoints / (2 * (TotFGA + (0.475 * TotFTA))),
+         FTRate = TotFTA / TotFGA,
+         ThreesShare = TotFGA3 / TotFGA,
+         OffRebPerc = TotOR / (TotOR + TotDRAllow),
+         DefRebPerc = TotDR / (TotDR + TotORAllow),
+         TotRebPerc = (TotDR + TotOR) / (TotDR + TotOR + TotDRAllow + TotORAllow)) %>%
+  select(Season, TeamID, TotPoints, TotPointsAllow, wins, WinPerc, OffRtg, DefRtg, SoS, Pie, OPie, Tie, AstRatio, TORatio, TSPerc, FTRate, ThreesShare, OffRebPerc, DefRebPerc, TotRebPerc)
+
+
+
+### Combine average and advanced statistics
+team_stats_full <- season_team_stats_averages %>% left_join(advanced_stats_season)
+
+colnames(team_stats_full)
+
+
+```
+
+OffRtg - Offensive Rating
+DefRtg - Deffensive Rating
+AstRatio - Assist Ratio
+TORatio - Turnover Ratio
+TSPerc - True Shooting Percentage
+FTRate - Free Throw Rate
+ThreesShare - Three Pointers Share
+OffRebPerc - Offensive Rebounding
+DefRebPerc - Defensive Rebounding
+TotRebPerc - Total Rebounding
+AvgPoss - Average Possessions
+AvgFGA3 - Average Threes Attempted
+AvgFGM3 - Average Threes Made
+AvgOR - Average Offensive Rebounds
+Avg_DR - Average Defensive Rebounds
+Avg_Blk - Average Blocks
+AvgStl - Average Steals
+
+
+```{r ERGM preprocessing}
+
+# Add team stats as node attributes
+temp_stats <- data.frame(TeamID=names(V(g_teams_full)))
+temp_stats$TeamID <- as.character(temp_stats$TeamID)
+temp_stats <- temp_stats %>%
+  left_join(team_stats_full %>% mutate(TeamID=as.character(TeamID)))
+
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="TSPerc",
+                           value=temp_stats$TSPerc)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="AstRatio",
+                           value=temp_stats$AstRatio)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="TORatio",
+                           value=temp_stats$TORatio)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="ThreesShare",
+                           value=temp_stats$ThreesShare)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="FTRate",
+                           value=temp_stats$FTRate)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="AvgPoss",
+                           value=temp_stats$AvgPoss)
+g_teams_full <- set_vertex_attr(graph=g_teams_full, name="EFGPerc",
+                           value=temp_stats$AvgPoss)
+
+# Transform igraph to network class
+g_teams_full_net <- asNetwork(g_teams_full)
+
+
+```
+
+```{r Model 1. Edges + Mutality + nodecov}
+
+ergm_model.1 <- ergm(g_teams_full_net ~ mutual +
+                        nodecov("TSPerc") + 
+                        nodecov("AstRatio") +
+                        nodecov("TORatio") + 
+                        nodecov("ThreesShare") + 
+                        nodecov("FTRate") + 
+                        nodecov("AvgPoss")) + 
+
+summary(ergm_model.1)
+
+```
+
+```{r Model 2. Edges + Mutality + nodecov + absdiff}
+
+ergm_model.2 <- ergm(g_teams_full_net ~ mutual +
+                        nodecov("TSPerc") + 
+                        nodecov("AstRatio") +
+                        nodecov("TORatio") + 
+                        nodecov("ThreesShare") + 
+                        nodecov("FTRate") + 
+                        nodecov("AvgPoss") +
+                       
+                        absdiff("TSPerc") + 
+                        absdiff("AstRatio") +
+                        absdiff("TORatio") + 
+                        absdiff("ThreesShare") + 
+                        absdiff("FTRate") + 
+                        absdiff("AvgPoss"))
+
+summary(ergm_model.2)
+
+```
+
+```{r Model 3. Edges + Mutality + nodecov + diff}
+
+ergm_model.3 <- ergm(g_teams_full_net ~ mutual +
+                        nodecov("TSPerc") + 
+                        nodecov("AstRatio") +
+                        nodecov("TORatio") + 
+                        nodecov("ThreesShare") + 
+                        nodecov("FTRate") + 
+                        nodecov("AvgPoss") +
+                       
+                        diff("TSPerc") + 
+                        diff("AstRatio") +
+                        diff("TORatio") + 
+                        diff("ThreesShare") + 
+                        diff("FTRate") + 
+                        diff("AvgPoss"))
+
+summary(ergm_model.3)
+
+```
+
+
+```{r Model 4. Mutality + nodeicov + diff}
+
+ergm_model.4 <- ergm(g_teams_full_net ~ mutual + 
+                        nodeicov("TSPerc") + 
+                        nodeicov("AstRatio") +
+                        nodeicov("TORatio") + 
+                        nodeicov("ThreesShare") + 
+                        nodeicov("FTRate") + 
+                        nodeicov("AvgPoss") + 
+                       
+                        diff("TSPerc") + 
+                        diff("AstRatio") +
+                        diff("TORatio") + 
+                        diff("ThreesShare") + 
+                        diff("FTRate") + 
+                        diff("AvgPoss"))
+
+summary(ergm_model.4)
+
+```
+
+
+
+```{r Model 5. Edges + Mutality + nodeicov + diff}
+
+ergm_model.5 <- ergm(g_teams_full_net ~ edges + mutual + 
+                        nodeicov("TSPerc") + 
+                        nodeicov("AstRatio") +
+                        nodeicov("TORatio") + 
+                        nodeicov("ThreesShare") + 
+                        nodeicov("FTRate") + 
+                        nodeicov("AvgPoss") + 
+                       
+                        diff("TSPerc") + 
+                        diff("AstRatio") +
+                        diff("TORatio") + 
+                        diff("ThreesShare") + 
+                        diff("FTRate") + 
+                        diff("AvgPoss"))
+
+summary(ergm_model.5)
+
+```
+
+
+
+
+
+```{r Diagnostics}
+
+par(mar=c(0,0,0,0))
+mcmc.diagnostics(ergm_model.5)
+
+```
+
+
+
+```{r}
+
+m5.gof<-gof(ergm_model.5 ~ idegree)
+
+```
+
+```{r}
+
+par(mfrow=c(1,1))
+plot(m5.gof)
+
+```
+
+
+
