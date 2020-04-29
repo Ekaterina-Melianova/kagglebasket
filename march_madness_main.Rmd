@@ -219,6 +219,19 @@ play_by_play <- play_by_play[play_by_play$Season == 2019,]
 ```
 
 
+# Introduction
+
+TODO: Mention that we analyse only the men teams
+
+Every team sport is a not only about the individual statistics of team or a player but more about overall dynamics and interactions between them. But how can we account for such interactions in the meaningfull and scientific way? In this notebook we gonna use Network approach to the analysis of the sport data to answer the set of different question regarding players interaction on the micro-level and overall team perfomance during the season on the macro-level. In particular we are intrested to find the answers to following questions:
+
+1. How we can operationalize importance of a player for the team and what are the players which are most important?
+2. What are the teams what rely mostly on the one "Talisman" player and what are the teams that have more equal squad?
+3. How can we define competitiveness during the regular season games and what are the conferencess with more competitiveness?
+4. What team statistics account for the winning strategy and how diffence in such statistics between two teams influence the result of the match?
+
+
+
 # Part 1. Network of Players
 
 ```{r Create Networks of assists for each team}
@@ -290,10 +303,30 @@ for(i in 1:length(team_ids)){
 ```
 
 
+We need two main terms to define a network : the nodes, which can be a person, an organization or even an atom like in this recent Kaggle competion [link], and the edges which will be the connection between two nodes, for example friendship tie. One way to think about of a team structure is to repsent it with nodes as a players and the edges as a common action between them, in this case assist. Such approach is used the literature ... FEW LINKS AND DESCRIPTION.
+
+
+In our case we gonna use Play-by-Play data during the 2019 season to create such distict network for each team.
+Below you can see an example of such network for the [team name] team. The direction of an edge is repsent to whom this player give an asisst and the width is telling us the total amount of assists during the season. 
+
+! TODO: PLOT with example of an random network with assists
+
+But the visual inspection of a network is rarely a proper way to make some relevant conculsions about importance of a player. For that purpose we can calcluate a bunch of statistics defined for the nodes in the network but let use only two for now. First of all we can gonna compute the *PageRank centrality* [link] for the player, which basically "a probability of a pass or shot involving this player within the network" and the *Betweenness centality* which we are going to interpret as "how the team would suffer if a player is removed". So lets look at our previous plot but now with node size repsent the PageRank centrality of a player.
+
+! TODO: PLOT with example of an random network with assists with node size as PageRank
+
+As you can see ... Describe the most PageRanked player 
+
+We also can look distribution of betweenness centrality for the "Team Name".
+
+! TODO: PLOT with example of an random network with assists with node size as Betweenness
+
+Despite the fact that [player name] was our "hero" player by PageRank centrality here we see that the team would suffer the most if we [player name 2] is gonna be blocked or removed from the game since he connects the team.
+
+
+
+
 ## 1.1. Network statistics for the players.
-
-
-TODO: Plot one network as an example
 
 
 
@@ -330,6 +363,10 @@ df_PlayersNetworkStats <- df_PlayersNetworkStats %>%
 
 ```
 
+
+
+So lets look who is the TOP-15 players by PageRank centrality in their teams.
+
 ```{r Plot. TOP 15 Players with highest PageRank, fig.height=5, fig.width=8}
 
 # TOP 15 Players with highest PageRank
@@ -342,6 +379,10 @@ df_PlayersNetworkStats %>% arrange(-pagerank) %>% head(15) %>%
 
 ```
 
+As we can see Christian Lutete has a highest PageRank amoungst others.
+
+Lets look at the most "betweenness" players for the team.
+
 ```{r Plot. TOP 15 Players with highest Betweenness, fig.height=5, fig.width=8}
 
 # TOP 15 Players with highest Betweenness
@@ -353,6 +394,8 @@ df_PlayersNetworkStats %>% arrange(-betweenness) %>% head(15) %>%
   theme(plot.title = element_text(size = 18))
 
 ```
+
+In this case Tyree Pickron, BJ Duling and P.J. Horne are playing the role of great "connectors" for the goal moments.
 
 
 ## 1.2. Network statistics (centralization) for the teams.
@@ -411,6 +454,8 @@ df_TeamsNetworkStats <- df_TeamsNetworkStats %>% left_join(df_Teams %>% select(T
 
 
 ```
+
+Of course we cannot compare these players directly to each since this measure mostly reflects the inside team impacts the player has. But what can we do to compare the teams directly to each other? In this case it might be usefull to calculate so called "centralization" of a whole network. High centralization will mean that the team is rely mostly on few number of players, while we low centralization will indicate the cituation where responsibilities are distributed equaly amongst the team members. So lets look at the teams with highest and lowest PageRank centralization to get a better understanding of what it really means.
 
 
 ### Example of teams with High and Low PageRank centralization.
@@ -471,6 +516,10 @@ plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_
 
 ```
 
+There is huge disbalance in Hampton team towards 4 players, while in Baylor the PageRank distributed evenly across the members.
+
+
+Lets look at the same plots, but now with examples of betweenness centralization.
 
 ### Example of teams with High and Low Betweenness centralization.
 
@@ -530,6 +579,8 @@ plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_
 
 ```
 
+There is huge Betweenness centralization in the Texas baseketball team, the overall connectivity between players will drop dramatically if the enemy team is gonna be able to efficiently netralize just one player - Kamaka Hepa
+
 
 
 ### Linear regression with Centralization metrics as IV and Median Rank during the season as DV.
@@ -549,6 +600,11 @@ summary(lm(median_rank ~ mean_transitivity + betweenness_centralization +
 
 
 # Part 2. Network of Teams
+
+
+Another instresting think that can be done based on the network perspective is to respesent a games played during as network where teams are gonna play the role of nodes and the edges are gonna repsent the games which two team played against each other. Direction of an edge is gonna repesent the winning team.
+
+
 
 ```{r Data Loading}
 
@@ -1365,6 +1421,20 @@ par(mfrow=c(1,1))
 plot(m5.gof)
 
 ```
+
+
+# Conclusion
+
+
+# References
+
+
+
+
+
+
+
+
 
 
 
