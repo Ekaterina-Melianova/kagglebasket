@@ -39,6 +39,7 @@ library(gridExtra)
 library('usmap') # geo
 library("PerformanceAnalytics")
 library("pheatmap")
+library(dichromat)
 
 # specific data manipulation
 library('lazyeval') # data wrangling
@@ -412,7 +413,6 @@ df_TeamsNetworkStats <- df_TeamsNetworkStats %>% left_join(df_Teams %>% select(T
 ```
 
 
-
 ### Example of teams with High and Low PageRank centralization.
 
 
@@ -568,21 +568,26 @@ df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
 
 setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 
+df_TeamConferences$TeamID <- as.character(df_TeamConferences$TeamID)
+
 # Select only 2019 data and replicate TeamID column
 df_TeamConferences <- df_TeamConferences %>% filter(Season == 2019) %>%
   mutate(WTeamID=TeamID, LTeamID=TeamID) %>% select(-c(Season))
 
-
-# Proportion of games played inside home confernces
-df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
-
 df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Season == 2019)
+
+df_RegularSeasonCompactResults$WTeamID <- as.character(df_RegularSeasonCompactResults$WTeamID)
+df_RegularSeasonCompactResults$LTeamID <- as.character(df_RegularSeasonCompactResults$LTeamID)
+
 
 df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>%
   left_join(df_TeamConferences %>% select(c(ConfAbbrev, WTeamID))) %>% rename(WConfAbbrev=ConfAbbrev) %>%
   left_join(df_TeamConferences %>% select(c(ConfAbbrev, LTeamID))) %>% rename(LConfAbbrev=ConfAbbrev)
 
 df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% mutate(same_conf=WConfAbbrev==LConfAbbrev)
+
+df_RegularSeasonCompactResults$WTeamID <- as.character(df_RegularSeasonCompactResults$WTeamID)
+df_RegularSeasonCompactResults$LTeamID <- as.character(df_RegularSeasonCompactResults$LTeamID)
 
 # Proportion
 sum(df_RegularSeasonCompactResults$same_conf) / nrow(df_RegularSeasonCompactResults)
@@ -679,14 +684,15 @@ df_ConferencesNetworkStats %>% arrange(-eigenvector_centralization) %>%
   geom_col() +
   coord_flip() + theme_classic(base_size = 14) + ggtitle("Conferences by competitiveness in 2019") + 
   labs(y="EigenVector centralization", x = "Conference") + 
-  theme(plot.title = element_text(size = 18))
+  scale_fill_gradientn(colors=colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100), guide="colorbar") +
+  theme(plot.title = element_text(size = 18), legend.position = "none")
 
 ```
 
 
 ```{r 1. Plot with example of Highest EigenVector centralizations, fig.height=6, fig.width=6}
 
-# 1. Example of the network with Highest PageRank centralization
+# 1. Example of the network with Highest EigenVector centralization
 
 # Create the graph
 G <- conference_graphs_list[[which.max(df_ConferencesNetworkStats$eigenvector_centralization)]]
@@ -718,6 +724,37 @@ plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_
 
 
 
+```{r 2. Plot with example of Lowest EigenVector centralizations, fig.height=6, fig.width=6}
+
+# 2. Example of the network with Lowest EigenVector centralization
+
+# Create the graph
+G <- conference_graphs_list[[which.min(df_ConferencesNetworkStats$eigenvector_centralization)]]
+G_name <- as.character(df_ConferencesNetworkStats[which.min(df_ConferencesNetworkStats$eigenvector_centralization),]$conference_fullname)
+
+# Set vertex size end edge width for plotting
+vertex_size <- as.numeric(eigen_centrality(G, directed=T)$vector) * 30
+# vertex_size <- ifelse(vertex_size <= 5, 5, vertex_size)
+edge_width <- E(G)$weight*0.3
+
+# Add team names
+vertex_ids <- data.frame(TeamID=names(V(G)))
+df_Teams$TeamID <- as.character(df_Teams$TeamID)
+vertex_ids <- vertex_ids %>% left_join(df_Teams %>% select(TeamID, TeamName))
+vertex_fullnames <- as.character(vertex_ids$TeamName)
+G <- set_vertex_attr(G, "fullname", value=vertex_fullnames)
+
+# Plot the graph
+plot.igraph(G, edge.arrow.size=0.7, layout=layout.kamada.kawai, edge.width=edge_width,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>20, vertex.attributes(G)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=0.8,
+            vertex.color=ifelse(vertex_size>20, "lightcoral", "gray45"),
+            main=paste(G_name, '\n Conference with Highest EigenVector Centralization'))
+
+```
+
+
 
 Heatmap with change of Competitiveness over time
 
@@ -727,6 +764,10 @@ setwd("C:/Kaggle/Data/March_Madness_Analytics_2020")
 
 df_TeamConferences <- read.csv('MDataFiles_Stage2/MTeamConferences.csv')
 df_RegularSeasonCompactResults <- read.csv('MDataFiles_Stage2/MRegularSeasonCompactResults.csv')
+
+df_TeamConferences$TeamID <- as.character(df_TeamConferences$TeamID)
+df_RegularSeasonCompactResults$WTeamID <- as.character(df_RegularSeasonCompactResults$WTeamID)
+df_RegularSeasonCompactResults$LTeamID <- as.character(df_RegularSeasonCompactResults$LTeamID)
 
 ### Conferences and seasons. Select for time-series plots
 conf_season <- data.frame(table(df_TeamConferences$ConfAbbrev, df_TeamConferences$Season))
@@ -855,18 +896,49 @@ selected_conferences_2000 <- (df_conferences_stats_seasons %>% filter(season == 
 df_conferences_stats_seasons <- df_conferences_stats_seasons %>% filter(conference_name %in% selected_conferences_2000) 
 df_conferences_stats_seasons <- df_conferences_stats_seasons %>% select(-c(id))
 
+# Add fullnames names of the conferences
+df_conferences_stats_seasons <- df_conferences_stats_seasons %>% left_join(df_Conferences,by = c("conference_name"="ConfAbbrev"))
+df_conferences_stats_seasons <- df_conferences_stats_seasons %>% rename(conference_fullname=Description)
+df_conferences_stats_seasons$conference_fullname <- as.character(df_conferences_stats_seasons$conference_fullname)
+# Remove "Conference" word
+df_conferences_stats_seasons$conference_fullname <- removeWords(df_conferences_stats_seasons$conference_fullname, " Conference")
+df_conferences_stats_seasons$conference_name <- NULL
+
 ```
 
-```{r Plot the heatmap with Conferences and Seasons competitiveness}
+```{r Take ordering from pheatmap, include=FALSE}
 
+# Create pheatmap object
 heatmap_comp <- spread(df_conferences_stats_seasons, season, eigenvector_centralization)
-rownames(heatmap_comp) <- heatmap_comp$conference_name
-heatmap_comp <- as.matrix(heatmap_comp %>% select(-c(conference_name)))
+rownames(heatmap_comp) <- heatmap_comp$conference_fullname
+heatmap_comp <- as.matrix(heatmap_comp %>% select(-c(conference_fullname)))
+heatmap_comp <- spread(df_conferences_stats_seasons, season, eigenvector_centralization)
+rownames(heatmap_comp) <- heatmap_comp$conference_fullname
+heatmap_comp <- as.matrix(heatmap_comp %>% select(-c(conference_fullname)))
+ph <- pheatmap(heatmap_comp, cluster_cols = F,
+         angle_col=45, main="Competitiveness in Conferences for the past 20 years")
 
-
-pheatmap(heatmap_comp, cluster_cols = F, angle_col=45, main="Competitiveness in Conferences for the past 20 years")
+# Order conference names according to the clustering done by pheatmap
+df_conferences_stats_seasons$conference_fullname <- factor(df_conferences_stats_seasons$conference_fullname, levels=ph$tree_row$labels[ph$tree_row$order])
 
 ```
+
+```{r Plot the heatmap with Conferences and Seasons competitiveness, fig.height=6, fig.width=10}
+
+ggplot(df_conferences_stats_seasons,
+               aes(season, conference_fullname)) + geom_tile(aes(fill=eigenvector_centralization),color = "white") +
+        #Creating legend
+        guides(fill=guide_colorbar("EigenVector centralization")) +
+        #Creating color range
+        scale_fill_gradientn(colors=colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100),guide="colorbar") +
+        #Rotating labels
+        theme(axis.text.x = element_text(angle = 0, hjust = 0,vjust=-0.05)) + theme_minimal(base_size = 14) +
+        ggtitle("Competitiveness inside conferences in 2000-2019") + labs(y="Conferences", x = "Season") +
+        theme(plot.title = element_text(size = 18), axis.ticks = element_blank(),
+              panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+              axis.text.y = element_text(margin = margin(r = 0))) + scale_x_continuous(expand=c(0,0))
+```
+
 
 
 ## 2.2. ERGM based on the Regular + Tourney games in 2019.
@@ -888,6 +960,9 @@ df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(Seas
 # Combine Regular and Tourney results
 df_FullCompactResults <- rbind(df_TourneyCompactResults, df_RegularSeasonCompactResults)
 
+# Recode TeamID to character
+df_FullCompactResults$WTeamID <- as.character(df_FullCompactResults$WTeamID)
+df_FullCompactResults$LTeamID <- as.character(df_FullCompactResults$LTeamID)
 
 
 # Create dataframe with team-to-team wins and loses
@@ -941,12 +1016,28 @@ g_teams_full <- set_vertex_attr(graph=g_teams_full, name="conf_name", value=temp
 
 ```{r Plot network of all matches in 2019, fig.height=15, fig.width=15}
 
-# TODO: Add color according to some advanced statistic of the team as an example.
+# Add team names
+vertex_ids <- data.frame(TeamID=names(V(g_teams_full)))
+df_Teams$TeamID <- as.character(df_Teams$TeamID)
+vertex_ids <- vertex_ids %>% left_join(df_Teams %>% select(TeamID, TeamName))
+vertex_fullnames <- as.character(vertex_ids$TeamName)
+g_teams_full <- set_vertex_attr(g_teams_full, "fullname", value=vertex_fullnames)
+
 
 # Plot the network
-vertex_size <- as.numeric(strength(g_teams_full, mode="in")) * 0.2
-plot.igraph(g_teams_full, edge.arrow.size=0.05, layout=layout.fruchterman.reingold, edge.width=0.01,
-            vertex.size=vertex_size, vertex.label=NA)
+vertex_size <- as.numeric(strength(g_teams_full, mode="in"))*0.25
+
+
+# Plot the graph
+plot.igraph(g_teams_full, edge.arrow.size=0.5, layout=layout.fruchterman.reingold, edge.width=0.01,
+            vertex.size=vertex_size, vertex.frame.color='darkgrey', edge.color='gray90',
+            vertex.label=ifelse(vertex_size>6, vertex.attributes(g_teams_full)$fullname, NA),
+            vertex.label.color='black', vertex.label.font=2, vertex.label.cex=1.4,
+            vertex.color=ifelse(vertex_size>6, "lightcoral", "lightgray"))
+title("Tourney and Regular Season Games in 2019",cex.main=2)
+
+
+
 
 ```
 
