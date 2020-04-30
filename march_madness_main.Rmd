@@ -1333,25 +1333,24 @@ cat('The AEF for Puerto Rico:', AEF, 'kg/mwh (general model)')
 
 
 
-```{r Diagnostics}
-
-par(mar=c(0,0,0,0))
-mcmc.diagnostics(ergm_model.5)
-
-```
-
-
-
 ```{r}
 
-m5.gof<-gof(ergm_model.5 ~ idegree)
-
-```
-
-```{r}
-
+# Model
+# For in-degree and out-degree and simulated quantiles the model looks good.
+m.gof <- gof(ergm_model)
 par(mfrow=c(1,1))
-plot(m5.gof)
+plot(m.gof)
+
+
+# MCMC diagnstics
+# MCMC convergences looks adequate
+par(mar=c(0,0,0,0))
+mcmc.diagnostics(ergm_model)
+
+```
+
+```{r}
+
 
 ```
 

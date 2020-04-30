@@ -3,29 +3,39 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-The second part of our work is devoted the analysis of a directed network in which each node represents a college basketball team, while a tie between a pair of teams indicates on an outcome of a game: outcoming ties signify a failure, incoming ties signify a victory. In other words, links direct to the winning teams, which therefore have the greatest indegree centrality.
+The next part of our work is devoted to the analysis of a directed network in which each node represents a college basketball team, while a tie between a pair of teams indicates on an outcome of a game: outcoming ties signify a failure, incoming ties signify a victory. In other words, the links direct to the winning teams, which are characterized by the greatest in-degree centrality.
 
-We pursue the goal of answering to the following question using a network-based methodology: what are the team-related attributes that can influence the probability of winning a game? That is to say, what are the team’s characteristics that can increase or decrease the probability of forming a directed link in the described graph?
+We pursue the goal of answering the following question using a network-based methodology: what are the team-related attributes that can influence the probability of winning a game? That is to say, what are the team’s characteristics that can increase or decrease the probability of forming a directed link in the described graph?
 
-To approach this issue, we use a statistical method termed Exponential Random Graph Modeling (ERGM). ERGM is a method in the area of social network analysis that allows to build complex network structures and model relationships between them (Robins et al. 2007). The model assumes that the emergence of a tie may be affected by individual attributes or the presence or absence of other ties. A distinctive feature of ERGM is that this model focuses on both a structural angle (e.g., transitivity, reciprocity) and individual aspects of vertices in the network (e.g., gender, income). Since ERGM is complicated in terms of an analytical solution, it uses Markov Chain Monte Carlo (MCMC) approach for the estimation procedure.
+To approach this issue, we use a statistical method termed Exponential Random Graph Modeling (ERGM). ERGM is a method in the area of social network analysis that allows building complex network structures and model relationships between them (Robins et al. 2007). The model assumes that the emergence of a tie may be affected by individual attributes or the presence or absence of other ties. A distinctive feature of ERGM is that this model focuses on both a structural angle (e.g., transitivity, reciprocity) and individual aspects of vertices in the network (e.g., gender, income). Since ERGM is complicated in terms of an analytical solution, it uses a Markov Chain Monte Carlo (MCMC) approach for the estimation procedure.
+
 The present investigation exploits a range of college basketball teams’ attributes that are available in the data:
 
 *	*TSPerc* - True Shooting Percentage
+
 *	*AstRatio* - Assist Ratio
+
 *	*TORatio* - Turnover Ratio
+
 *	*AvgPoss* - Average Possessions
+
 *	*FTRate* - Free Throw Rate
+
 *	*ThreesShare* - Three Pointers Share
+
 
 We leverage the following ERGM terms that are suitable for a directed network and continuous (as opposed to categorical) features of nodes (teams) [link]: 
 
 *	**edges (the effect of a covariate for in-edges)**: the term introduces a network statistic equal to the number of edges in the graph.
-*	**mutual (the effect of mutiality)**: in binary ERGMs this term adds a statistic equal to the number of pairs of nodes i and j for which (i,j) and (j,i) both exist.
-*	**nodeicov**: the total attribute value of a node j for all edges (i,j) in the network.
-*	**diff**: this term plugs a network statistic that is equal to the sum of differences between the origin of a directed link (i) and head as its destination(j) over all directed edges (i,j).
+
+*	**mutual (the effect of mutuality)**: in binary ERGMs this term adds a statistic equal to the number of pairs of nodes $i$ and $j$ for which $(i,j)$ and $(j,i)$ both exist.
+
+*	**nodeicov**: the total attribute value of a node $j$ for all edges $(i,j)$ in the network.
+
+*	**diff**: this term plugs a network statistic that is equal to the sum of differences between the origin of a directed link $(i)$ and head as its destination $(j)$ over all directed edges $(i,j)$.
 
 
-First, we specify a model with solely structural terms and then add the terms that deal with characteristics of vertices. The table below shows parameter estimates for our base and main specifications.
+First, we specify a model with solely structural terms and then add the terms that deal with characteristics of vertices. The ERGM diagnostics procedures an interested reader can find in the code. The table below shows parameter estimates for our base and main specifications. Further, we outline and interpret an array of inferences that can be made.
 
 <div align="center">
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -47,6 +57,17 @@ ergm_model <- ergm(g_teams_full_net ~ edges + mutual +
                         diff("FTRate") + 
                         diff("AvgPoss"), verbose = F)
 
+# Model
+# For in-degree and out-degree and simulated quantiles the model looks good.
+#m.gof <- gof(ergm_model)
+#par(mfrow=c(1,1))
+#plot(m.gof)
+
+# MCMC diagnstics
+# MCMC convergences looks adequate
+#par(mar=c(0,0,0,0))
+#mcmc.diagnostics(ergm_model)
+
 stargazer(ergm_model.0, ergm_model, type = 'text',
             title = "RESULTS OF ERGM ESTIMATION",
             dep.var.caption = "",
@@ -58,21 +79,21 @@ stargazer(ergm_model.0, ergm_model, type = 'text',
 
 ```{r echo=FALSE}
 edges_prob <- round(100*plogis(ergm_model.0$coef[['edges']]),2)
-cat('The probability of a tie formation in the college basketball team network, holding mutuality effect constant, is equal to:', edges_prob, '%')
+cat('The probability of a directed tie formation (winning) in the college basketball team network, holding mutuality effect constant, is equal to:', edges_prob, '%')
 ```
 
-This means that our network in terms of link formation is significantly different from a random graph: it has much lower connections between teams than expected by chance. This is understandable: teams are separated by conferences where the bulk of the mathces are held. This therefore determines low connetivity of the network.
+This means that our network in terms of link formation is significantly different from a random graph: it has much lower connections between teams than expected by chance. This is understandable: teams are segregated by conferences where the bulk of the matches are held. This, therefore, determines the low connectivity of the network.
 
 ```{r echo=FALSE}
 mutual_prob <- round(100*plogis(ergm_model.0$coef[['mutual']]),2)
-cat('The probability of a tie formation in the college basketball team network, given the presence of mutual ties, is equal to:', mutual_prob, '%')
+cat('The probability of a directed tie formation (winning) in the college basketball team network, given the presence of mutual ties, is equal to:', mutual_prob, '%')
 ```
 
-In other words, we are much more likely to see a tie from a node $i$ to a node $j$ if $j$ to $i$ is true than if $j$ does not nominate $i$. This is indicative of the fact that a behavior of the teams in general is highly non-deterministic: in a pair of teams both of them can win and lose a match (i.e., send and recieve a tie) over the same season.
+In other words, we are much more likely to see a tie from a node $i$ to a node $j$ if $j$ to $i$ is true than if $j$ does not nominate $i$. This is indicative of the fact that the behavior of the teams, in general, is highly non-deterministic: in a pair of teams both of them can win and lose a match (i.e., send and receive a tie) over the same season.
 
-Let us proceed to the interpretation of the terms responsible for the attributes of the nodes in our main model. As for the nodeicov effect, there are 2 statistically significant coefficients registered for TORatio (negative influence) and FTRate (positive influence). Specifically, this indicates that growth in the Turnover Ratio of a team reduces its chances to win, whereas growth in the Free Throw Rate increases its chances to defeat a competetitor.
+Let us proceed to the interpretation of the ERGM terms responsible for the attributes of the nodes in our main model. As for the nodeicov effect, there are 2 statistically significant coefficients registered for TORatio (negative influence) and FTRate (positive influence). Specifically, this indicates that growth in the Turnover Ratio of a team reduces its chances to win, whereas growth in the Free Throw Rate increases its chances to defeat a competitor.
 
-We can compute probabilities of a ties formation (i.e., winning a game) for a selected values of TORatio and FTRate attributes. Let us demonstrate that only for  one characteristic, using its minimun and maximun observed values as examples of high and low feature manifestations.
+We can compute probabilities of a tie formation (i.e., of winning a game) for selected values of TORatio and FTRate attributes. Let us demonstrate that only for one characteristic, using its minimum and maximum observed values as examples of high and low feature manifestations.
 
 ```{r echo=FALSE}
 nodeicov.TORatio_prob_min <- round(100*plogis(ergm_model$coef[['edges']] + 
@@ -92,52 +113,54 @@ cat('The probability of a directed tie formation (winning) for a team with HIGH 
 cat('The probability of a directed tie formation (winning) for a team with LOW Turnover Ratio, holding mutuality and difference effects constant, is equal to:', nodeicov.TORatio_prob_min, '%')
 ```
 
-As for the difference component in our model, each of the respective attribute demonstrated a statistical significance. True Shooting Percentage, Assist Ratio, Free Throw Rate showed a negative signs, while Turnover Ratio, Three Pointers Share, and AvgPoss - postive. For the positive effects this means that higher chances of victory belong to those teams that have lower values of the respective attribute in comparison the values of their competitors. Contrariwise, for the negative effects, the finding informs us that teams are more likely to become winners in a game if they have greater manifestation of the repective attirbute compared that of their competitors.
+As for the *difference* components in our model, each of the respective attributes demonstrated a statistical significance. *True Shooting Percentage, Assist Ratio, Free Throw Rate showed* negative signs, while *Turnover Ratio, Three Pointers Share*, and *AvgPoss* - positive signs. For the positive effects, this means that higher chances of victory belong to those teams that have lower values of the analyzed attribute in comparison to the values of their competitors. For instance, if a team with high small True Shooting Percentage is playing with a team with huge True Shooting Percentage the former has greater chances to beat the latter.
 
-We can demostrate these statements, taking one variable with positive effect and calculating the corresponding probabilities for several combinations of its values for a pair of teams.
+Contrariwise, for the negative effects, the finding informs us that teams are more likely to become winners in a game if they have a greater manifestation of the respective attribute compared to that of their competitors. For example, if a team with high small Average Possessions is playing with a team with huge values of the Average Possessions the latter has greater chances to beat the former.
+
+We can demonstrate these statements, taking one variable and calculating the corresponding probabilities for several combinations of its values (maximum and minimum observed values) for a pair of teams (see below).
 
 ```{r echo=FALSE}
 
-diff.t_h.TSPercb_min_max <- round(100*plogis(ergm_model$coef[['edges']] + 
+diff.t_h.AstRatio_min_max <- round(100*plogis(ergm_model$coef[['edges']] + 
                                             ergm_model$coef[['mutual']] +
-                                            ergm_model$coef[['diff.t-h.TSPerc']]*
+                                            ergm_model$coef[['diff.t-h.AstRatio']]*
                                  (min(V(g_teams_full)$TORatio) - 
                                  max((V(g_teams_full)$TORatio)))),2)
 
-diff.t_h.TSPercb_max_max <- round(100*plogis(ergm_model$coef[['edges']] + 
+diff.t_h.AstRatio_max_max <- round(100*plogis(ergm_model$coef[['edges']] + 
                                             ergm_model$coef[['mutual']] +
-                                            ergm_model$coef[['diff.t-h.TSPerc']]*
+                                            ergm_model$coef[['diff.t-h.AstRatio']]*
                                  (max(V(g_teams_full)$TORatio) - 
                                  max((V(g_teams_full)$TORatio)))),2)
 
-diff.t_h.TSPercb_min_min <- round(100*plogis(ergm_model$coef[['edges']] + 
+diff.t_h.AstRatio_min_min <- round(100*plogis(ergm_model$coef[['edges']] + 
                                             ergm_model$coef[['mutual']] +
-                                            ergm_model$coef[['diff.t-h.TSPerc']]*
+                                            ergm_model$coef[['diff.t-h.AstRatio']]*
                                  (min(V(g_teams_full)$TORatio) - 
                                  min((V(g_teams_full)$TORatio)))),2)
 
-diff.t_h.TSPercb_max_min <- round(100*plogis(ergm_model$coef[['edges']] + 
+diff.t_h.AstRatio_max_min <- round(100*plogis(ergm_model$coef[['edges']] + 
                                             ergm_model$coef[['mutual']] +
-                                            ergm_model$coef[['diff.t-h.TSPerc']]*
+                                            ergm_model$coef[['diff.t-h.AstRatio']]*
                                  (max(V(g_teams_full)$TORatio) - 
                                  min((V(g_teams_full)$TORatio)))),2)
 ```
 
 
 ```{r echo=FALSE}
-cat('The probability of a directed tie formation (winning) for a team with HIGH True Shooting Percentage when its competitor has LOW True Shooting Percentage is equal to:', diff.t_h.TSPercb_min_max, '%') 
+cat('The probability of a directed tie formation (winning) for a team with HIGH Assist Ratio when its competitor has LOW True Shooting Percentage is equal to:', diff.t_h.AstRatio_min_max, '%') 
 ```
 
 ```{r echo=FALSE}
-cat('The probability of a directed tie formation (winning) for a team with HIGH True Shooting Percentage when its competitor has HIGH True Shooting Percentage is equal to:', diff.t_h.TSPercb_max_max, '%') 
+cat('The probability of a directed tie formation (winning) for a team with HIGH Assist Ratio when its competitor has HIGH True Shooting Percentage is equal to:', diff.t_h.AstRatio_max_max, '%') 
 ```
 ```{r echo=FALSE}
-cat('The probability of a directed tie formation (winning) for a team with LOW True Shooting Percentage when its competitor has LOW True Shooting Percentage is equal to:', diff.t_h.TSPercb_min_min, '%') 
+cat('The probability of a directed tie formation (winning) for a team with LOW Assist Ratio when its competitor has LOW True Shooting Percentage is equal to:', diff.t_h.AstRatio_min_min, '%') 
 ```
 
 
 ```{r echo=FALSE}
-cat('The probability of a directed tie formation (winning) for a team with HIGH True Shooting Percentage when its competitor has LOW True Shooting Percentage is equal to:', diff.t_h.TSPercb_max_min, '%') 
+cat('The probability of a directed tie formation (winning) for a team with LOW Assist Ratio when its competitor has HIGH True Shooting Percentage is equal to:', diff.t_h.AstRatio_max_min, '%') 
 ```
 
 
