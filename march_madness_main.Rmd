@@ -8,46 +8,46 @@ output: html_notebook
 ```{r Libraries}
 
 # general visualisation
-library('ggplot2') # visualisation
-library('scales') # visualisation
-library('patchwork') # visualisation
-library('RColorBrewer') # visualisation
-library('corrplot') # visualisation
-library('ggthemes') # visualisation
-library('ggrepel') # visualisation
+library(ggplot2) # visualisation
+library(scales) # visualisation
+library(patchwork) # visualisation
+library(RColorBrewer) # visualisation
+library(corrplot) # visualisation
+library(ggthemes) # visualisation
+library(ggrepel) # visualisation
 
 # general data manipulation
-library('dplyr') # data manipulation
-library('readr') # input/output
-library('vroom') # input/output
-library('skimr') # overview
-library('tibble') # data wrangling
-library('tidyr') # data wrangling
-library('stringr') # string manipulation
-library('forcats') # factor manipulation
+library(dplyr) # data manipulation
+library(readr) # input/output
+library(vroom) # input/output
+library(skimr) # overview
+library(tibble) # data wrangling
+library(tidyr) # data wrangling
+library(stringr) # string manipulation
+library(forcats) # factor manipulation
 
 # specific visualisation
-library('alluvial') # visualisation
-library('ggrepel') # visualisation
-library('ggforce') # visualisation
-library('ggridges') # visualisation
-library('gganimate') # animations
-library('GGally') # visualisation
-library('ggExtra') # visualisation
-library('viridis') # visualisation
+library(alluvial) # visualisation
+library(ggrepel) # visualisation
+library(ggforce) # visualisation
+library(ggridges) # visualisation
+library(gganimate) # animations
+library(GGally) # visualisation
+library(ggExtra) # visualisation
+library(viridis) # visualisation
 library(gridExtra)
-library('usmap') # geo
-library("PerformanceAnalytics")
-library("pheatmap")
+library(usmap) # geo
+library(PerformanceAnalytics)
+library(pheatmap)
 library(dichromat)
 
 # specific data manipulation
-library('lazyeval') # data wrangling
-library('broom') # data wrangling
-library('purrr') # data wrangling
-library('reshape2') # data wrangling
-library('rlang') # encoding
-library('kableExtra') # display
+library(lazyeval) # data wrangling
+library(broom) # data wrangling
+library(purrr) # data wrangling
+library(reshape2) # data wrangling
+library(rlang) # encoding
+library(kableExtra) # display
 library(tm)
 
 
@@ -107,7 +107,6 @@ df_Seasons <- read.csv('MDataFiles_Stage2/MSeasons.csv')
 
 
 ```
-
 
 
 ```{r Data Loading. Play-by-play}
@@ -651,6 +650,9 @@ sum(df_RegularSeasonCompactResults$same_conf) / nrow(df_RegularSeasonCompactResu
 # Select only matches in the same conference
 df_RegularSeasonCompactResults <- df_RegularSeasonCompactResults %>% filter(same_conf)
 
+df_Teams$TeamID <- as.character(df_Teams$TeamID)
+
+
 # Create dataframe with team-to-team wins and loses
 team_to_team_results <- df_RegularSeasonCompactResults %>% 
   # filter(Season >= 2009) %>% 
@@ -1051,13 +1053,14 @@ edgelist_wteam_lteam_full <- df_FullCompactResults %>%
 colnames(edgelist_wteam_lteam_full)[3] <- 'weight'
 
 # Drop weights
-edgelist_wteam_lteam_full$weight <- NULL
+# edgelist_wteam_lteam_full$weight <- NULL
 
 # Change order of WTeam and LTeam
-edgelist_wteam_lteam_full <- edgelist_wteam_lteam_full %>% select(LTeamID, WTeamID)
+edgelist_wteam_lteam_full <- edgelist_wteam_lteam_full %>% select(LTeamID, WTeamID, weight)
 
 # Create the network
 g_teams_full <- graph.data.frame(edgelist_wteam_lteam_full, directed = T)
+
 
 # Add conference affilation
 temp_stats <- data.frame(TeamID=names(V(g_teams_full)))
@@ -1242,28 +1245,30 @@ advanced_stats_season <- season_team_stats_tot %>%
 ### Combine average and advanced statistics
 team_stats_full <- season_team_stats_averages %>% left_join(advanced_stats_season)
 
-colnames(team_stats_full)
 
 
 ```
 
 OffRtg - Offensive Rating
 DefRtg - Deffensive Rating
-AstRatio - Assist Ratio
-TORatio - Turnover Ratio
-TSPerc - True Shooting Percentage
-FTRate - Free Throw Rate
-ThreesShare - Three Pointers Share
 OffRebPerc - Offensive Rebounding
 DefRebPerc - Defensive Rebounding
 TotRebPerc - Total Rebounding
-AvgPoss - Average Possessions
 AvgFGA3 - Average Threes Attempted
 AvgFGM3 - Average Threes Made
 AvgOR - Average Offensive Rebounds
 Avg_DR - Average Defensive Rebounds
 Avg_Blk - Average Blocks
 AvgStl - Average Steals
+
+TSPerc - True Shooting Percentage
+AstRatio - Assist Ratio
+TORatio - Turnover Ratio
+AvgPoss - Average Possessions
+FTRate - Free Throw Rate
+ThreesShare - Three Pointers Share
+
+
 
 
 ```{r ERGM preprocessing}
@@ -1295,89 +1300,13 @@ g_teams_full_net <- asNetwork(g_teams_full)
 
 ```
 
-```{r Model 1. Edges + Mutality + nodecov}
-
-ergm_model.1 <- ergm(g_teams_full_net ~ mutual +
-                        nodecov("TSPerc") + 
-                        nodecov("AstRatio") +
-                        nodecov("TORatio") + 
-                        nodecov("ThreesShare") + 
-                        nodecov("FTRate") + 
-                        nodecov("AvgPoss")) + 
-
-summary(ergm_model.1)
-
-```
-
-```{r Model 2. Edges + Mutality + nodecov + absdiff}
-
-ergm_model.2 <- ergm(g_teams_full_net ~ mutual +
-                        nodecov("TSPerc") + 
-                        nodecov("AstRatio") +
-                        nodecov("TORatio") + 
-                        nodecov("ThreesShare") + 
-                        nodecov("FTRate") + 
-                        nodecov("AvgPoss") +
-                       
-                        absdiff("TSPerc") + 
-                        absdiff("AstRatio") +
-                        absdiff("TORatio") + 
-                        absdiff("ThreesShare") + 
-                        absdiff("FTRate") + 
-                        absdiff("AvgPoss"))
-
-summary(ergm_model.2)
-
-```
-
-```{r Model 3. Edges + Mutality + nodecov + diff}
-
-ergm_model.3 <- ergm(g_teams_full_net ~ mutual +
-                        nodecov("TSPerc") + 
-                        nodecov("AstRatio") +
-                        nodecov("TORatio") + 
-                        nodecov("ThreesShare") + 
-                        nodecov("FTRate") + 
-                        nodecov("AvgPoss") +
-                       
-                        diff("TSPerc") + 
-                        diff("AstRatio") +
-                        diff("TORatio") + 
-                        diff("ThreesShare") + 
-                        diff("FTRate") + 
-                        diff("AvgPoss"))
-
-summary(ergm_model.3)
-
-```
-
-
-```{r Model 4. Mutality + nodeicov + diff}
-
-ergm_model.4 <- ergm(g_teams_full_net ~ mutual + 
-                        nodeicov("TSPerc") + 
-                        nodeicov("AstRatio") +
-                        nodeicov("TORatio") + 
-                        nodeicov("ThreesShare") + 
-                        nodeicov("FTRate") + 
-                        nodeicov("AvgPoss") + 
-                       
-                        diff("TSPerc") + 
-                        diff("AstRatio") +
-                        diff("TORatio") + 
-                        diff("ThreesShare") + 
-                        diff("FTRate") + 
-                        diff("AvgPoss"))
-
-summary(ergm_model.4)
-
-```
-
-
 
 ```{r Model 5. Edges + Mutality + nodeicov + diff}
+ergm_model.0 <- ergm(g_teams_full_net ~ edges + mutual)
 
-ergm_model.5 <- ergm(g_teams_full_net ~ edges + mutual + 
+summary(ergm_model.0)
+
+ergm_model <- ergm(g_teams_full_net ~ edges + mutual + 
                         nodeicov("TSPerc") + 
                         nodeicov("AstRatio") +
                         nodeicov("TORatio") + 
@@ -1392,11 +1321,15 @@ ergm_model.5 <- ergm(g_teams_full_net ~ edges + mutual +
                         diff("FTRate") + 
                         diff("AvgPoss"))
 
-summary(ergm_model.5)
+summary(ergm_model)
 
 ```
 
 
+```{r}
+edges_prob <- plogis(sampmodel.01$coef[['edges']])
+cat('The AEF for Puerto Rico:', AEF, 'kg/mwh (general model)')
+```
 
 
 
